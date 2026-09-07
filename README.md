@@ -53,7 +53,7 @@ Repository [bitvavo/python-bitvavo-api](https://github.com/bitvavo/python-bitvav
   Zeitzone, DB-/Log-Pfad mit Größe, Eintrags-Zählungen, Betriebsmodus (Simulation/Echtbetrieb),
   API-Key-Status inkl. Berechtigungen, Startup-Selbstcheck-Ergebnisse, Scheduler-Status.
 - **Healthcheck**: `/health` (ohne Login) als maschinenlesbares JSON für Docker und
-  `verifizieren.sh`. Ein Bash-Skript `verifizieren.sh` prüft Erreichbarkeit, /health,
+  sowie Gesundheit (`/health`, Logs, Prozess, Port).
   lokale Dateien und Python-Umgebung (optional `--strict`).
 
 ---
@@ -134,22 +134,19 @@ Alle Screenshots wurden mit **Playwright** direkt aus dem laufenden App generier
 
 | Bild | Inhalt |
 |------|--------|
-| [`screen/01_login.png`](screen/01_login.png) | Anmeldung |
-| [`screen/02_dashboard.png`](screen/02_dashboard.png) | Dashboard (Gesamtwert, Chart, Guthaben, Kryptowährungen) |
-| [`screen/03_positions.png`](screen/03_positions.png) | Meine Kryptowährungen (Positionen) |
-| [`screen/04_wizard_anlegen.png`](screen/04_wizard_anlegen.png) | Zeitplan anlegen (Wizard) |
-| [`screen/05_wizard_bestätigung.png`](screen/05_wizard_bestätigung.png) | Zeitplan gespeichert (Vorschau) |
-| [`screen/06_trades.png`](screen/06_trades.png) | Trades |
-| [`screen/07_portfolio.png`](screen/07_portfolio.png) | Portfolio & Steuern |
-| [`screen/08_einstellungen.png`](screen/08_einstellungen.png) | Einstellungen (API-Key, Berechtigungen) |
-| [`screen/09_system.png`](screen/09_system.png) | System |
-| [`screen/10_chart_toggle.png`](screen/10_chart_toggle.png) | Chart-Ansicht (BTC-EUR / Portfolio-Wert) |
+| `screen/01_login.png` | Login |
+| `screen/02_dashboard.png` | Dashboard (Gesamtwert, Chart, Guthaben, Kryptowährungen) |
+| `screen/03_portfolio.png` | Portfolio & Steuern |
+| `screen/04_schedule.png` | Zeitpläne (DCA) |
+| `screen/05_simulation.png` | Simulation |
+| `screen/06_settings.png` | Einstellungen |
+| `screen/07_chart.png` | Chart-Ansicht |
 
 ### Hinweis
 
-Die Screenshots enthalten keine echten Daten, API-Keys oder Secrets. Für das Portfolio
-muss man die Bilder mit eigenen Daten aufnehmen (z. B. Screenshots aus dem eigenen Browser).
-Siehe `screen/SCREENSHOTS.md` für Details zum Umgang mit echten Daten.
+Die Screenshots wurden in einer authentifizierten **Playwright-Session** mit
+`SIMULATION_MODE=true` aufgenommen und enthalten **keine echten API-Keys, Secrets
+oder persönlichen Daten**.
 
 ---
 
@@ -165,6 +162,34 @@ Siehe `screen/SCREENSHOTS.md` für Details zum Umgang mit echten Daten.
 | `DB_PATH`          | `data/bitmaster.db`         | Pfad zur SQLite-Datenbank                                                    |
 | `LOG_FILE`         | `data/bitmaster.log`        | Pfad zur Logdatei                                                            |
 | `TZ`               | (Containerzeit)             | Zeitzone für den Scheduler                                                   |
+
+---
+
+## Haftungsausschluss und Einschränkungen
+
+Dieses Projekt dient ausschließlich **Demonstrations- und Lernzwecken**. Es handelt sich nicht um eine produktionsreife Handelssoftware und nicht um eine Steuerberatung.
+
+- **Keine Steuerberatung**: Das enthaltene Steuer-Dashboard (FIFO-Berechnung, Haltefrist, 600-€-Freigrenze) ist eine unverbindliche Hilfestellung zur Selbstorganisation und ersetzt keine individuelle steuerliche Beratung durch einen zugelassenen Steuerberater oder Wirtschaftsprüfer.
+- **Keine Anlageberatung**: Die berechneten Indikatoren, Signale und Verkaufsempfehlungen basieren auf historischen Daten und Heuristiken. Sie begründen keine Kauf- oder Verkaufsempfehlung im rechtlichen Sinne.
+- **Verwendung auf eigene Gefahr**: Der Einsatz mit echten API-Keys und Echtgeld-Orders erfolgt ausschließlich auf eigenes Risiko. Der Autor übernimmt keine Haftung für finanzielle Verluste, Fehlkonfigurationen, Datenverlust oder Schäden jeglicher Art, die aus der Nutzung dieser Software entstehen können.
+
+---
+
+## Sicherheitswarnung — nur für lokale Testumgebungen
+
+Diese Software wurde für den **ausschließlichen Betrieb in lokalen, vertrauenswürdigen Testumgebungen** konzipiert. Sie ist **nicht für den produktiven Einsatz auf öffentlich erreichbaren Servern** geeignet und durchläuft derzeit keine formale Sicherheitsprüfung nach industriellen Standards.
+
+- **Kein produktiver Einsatz**: Betreiben Sie diese Anwendung **nicht** in Netzsegmenten, die aus dem Internet erreichbar sind, und exponieren Sie sie **nicht** ohne weitere Absicherung über Firewalls, Reverse-Proxies oder VPNs.
+- **Fehlende Sicherheitsprüfung**: Es wurden bislang keine Penetrationstests, Code-Audits oder formalen Sicherheitszertifizierungen durchgeführt. Schwachstellen sind nicht ausgeschlossen.
+- **Erforderliche Maßnahmen vor jedem Einsatz**: Vor einer Nutzung außerhalb einer isolierten lokalen Testmaschine sind mindestens folgende Schritte durchzuführen:
+  - Formale Sicherheitsprüfung des gesamten Codes, insbesondere der Authentifizierung, Session-Verwaltung, Eingabevalidierung und Kryptografie
+  - Härtung der Flask-Konfiguration (HTTPS, HSTS, sichere Cookies, CORS-Einschränkungen)
+  - Absicherung des Datenbankzugriffs und der API-Keys (HSM, Secret-Manager, keine Klartextspeicherung)
+  - Regelmäßige Abhängigkeitsprüfungen (`pip-audit`, `safety`) und Updates
+  - Intrusion-Detection, Logging-Monitoring und Incident-Response-Prozess
+- **Sensible Daten**: `.env`, API-Keys, Secrets und die SQLite-Datenbank enthalten hochsensible Informationen. Sie dürfen **niemals** in Versionsverwaltungen, öffentlichen Repositories oder unsicheren Speichern abgelegt werden.
+
+Durch die Nutzung bestätigen Sie, dass Sie die Risiken verstanden haben und die Software nur in der vorgesehenen isolierten Testumgebung einsetzen.
 
 ---
 
@@ -203,33 +228,23 @@ keine Steuerberatung. Für eine verbindliche Aussage einen Steuerberater konsult
 
 ```text
 bitvavo-autobot/
-├── app.py                 # Hauptprogramm
+├── app.py                 # Flask-App
 ├── requirements.txt       # Python-Abhängigkeiten
-├── Dockerfile             # Docker-Image definiert
-├── docker-compose.yml     # Docker-Konfiguration
+├── Dockerfile             # Container-Image
+├── docker-compose.yml     # Compose-Definition
 ├── .env.example           # Konfigurationsvorlage (kein echtes .env!)
 ├── .gitignore            # Ausschluss von sensiblen/lokalen Dateien
-├── verifizieren.sh       # Bash-Prüfskript
-├── LEITFADEN.md           # Bedienungsanleitung
-├── KITAP_NOTES.md         # Statusnotizen für Kitap-Upload (optional)
 ├── templates/             # Web-Oberfläche (Jinja2 + Bootstrap)
 ├── static/               # CSS/JS-Bestandteile
-├── screen/               # (optional) Screenshots für Portfolio
-└── data/                 # (wird ignoriert) Datenbank + Logs — nicht im Kitap!
+├── screen/               # README-Screenshots
+└── data/                 # Datenbank + Logs — wird ignoriert, nicht im Git
 ```
 
 ---
 
 **Wichtiger Hinweis:**
 
-- Das **echte .env** mit Passwörtern/API-Keys/ENCRYPTION_KEY darf **nicht** im Kitap-Archiv
+- Das **echte .env** mit Passwörtern/API-Keys/ENCRYPTION_KEY darf **nicht** in Versionsverwaltungen
   landen. Es ist über `.gitignore` ausgeschlossen. Für die Weitergabe nutzt man nur
   `.env.example` und lässt den Nutzer ein eigenes `.env` erstellen.
-- Der Ordner `data/` (Datenbank, Logs) wird ignoriert und gehört **nicht** ins Archiv.
-
----
-
-**Hinweis zur Verwendung als Portfolio:** Das Projekt ist so aufgebaut, dass man es auf einer
-eigenen Webseite einfach vorstellen kann — mit Screenshots, einer kurzen Beschreibung und der
-Installationsanleitung. Es enthält keine echten Schlüssel oder Secrets und lässt sich leicht
-anpassen oder erweitern.
+- Der Ordner `data/` (Datenbank, Logs) wird ignoriert und gehört **nicht** ins Repository.

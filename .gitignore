@@ -15,5 +15,4 @@ __pycache__/
 # macOS
 .DS_Store
 
-# Screenshots (werden nur lokal verwaltet, ggf. als Kitap-Ressource)
-screen/*.png
+
