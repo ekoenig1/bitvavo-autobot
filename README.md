@@ -4,10 +4,6 @@ Automatisierter Krypto-Assistent für die Börse **Bitvavo** mit einer modernen
 Bootstrap-Weboberfläche. Zeitgesteuerte Käufe (DCA), Handelsregeln, Trade-Historie-Import,
 Kontostand, technische Indikatoren und ein Portfolio-/Steuer-Dashboard (FIFO, 1-Jahres-Frist).
 
-Dieses Projekt dient als Portfolio-Beispiel — der Code, die Struktur und die Dokumentation
-sind so aufgebaut, dass man die App lokal oder im Docker-Container starten und nach Belieben
-weiterbauen kann.
-
 Verwendet die **offizielle Bitvavo-SDK** (`python-bitvavo-api`) aus dem
 Repository [bitvavo/python-bitvavo-api](https://github.com/bitvavo/python-bitvavo-api).
 
@@ -132,15 +128,17 @@ Alle Screenshots wurden mit **Playwright** direkt aus dem laufenden App generier
 
 ### Screenshots
 
-| Bild | Inhalt |
-|------|--------|
-| `screen/01_login.png` | Login |
-| `screen/02_dashboard.png` | Dashboard (Gesamtwert, Chart, Guthaben, Kryptowährungen) |
-| `screen/03_portfolio.png` | Portfolio & Steuern |
-| `screen/04_schedule.png` | Zeitpläne (DCA) |
-| `screen/05_simulation.png` | Simulation |
-| `screen/06_settings.png` | Einstellungen |
-| `screen/07_chart.png` | Chart-Ansicht |
+Klicke auf ein Bild, um es zu vergrößern.
+
+| Vorschau | Bild | Inhalt |
+|----------|------|--------|
+| <a href="screen/01_login.png"><img src="screen/01_login.png" width="220"></a> | `01_login.png` | Login |
+| <a href="screen/02_dashboard.png"><img src="screen/02_dashboard.png" width="220"></a> | `02_dashboard.png` | Dashboard (Gesamtwert, Chart, Guthaben, Kryptowährungen) |
+| <a href="screen/03_portfolio.png"><img src="screen/03_portfolio.png" width="220"></a> | `03_portfolio.png` | Portfolio & Steuern |
+| <a href="screen/04_trades.png"><img src="screen/04_trades.png" width="220"></a> | `04_trades.png` | Zeitpläne (DCA) |
+| <a href="screen/05_balance.png"><img src="screen/05_balance.png" width="220"></a> | `05_balance.png` | Simulation |
+| <a href="screen/06_settings.png"><img src="screen/06_settings.png" width="220"></a> | `06_settings.png` | Einstellungen |
+| <a href="screen/07_system.png"><img src="screen/07_system.png" width="220"></a> | `07_system.png` | Chart-Ansicht |
 
 ### Hinweis
 
