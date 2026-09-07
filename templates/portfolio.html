@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+{% block title %}Portfolio &amp; Steuern – Bitvavo-Autobot{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-pie-chart"></i> Portfolio &amp; Steuern</h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{{ url_for('import_trades') }}" class="btn btn-outline-success">
+      <i class="bi bi-cloud-download"></i> Historie importieren
+    </a>
+    <form method="GET" action="{{ url_for('portfolio_export') }}" class="d-flex align-items-center gap-2">
+      <select class="form-select form-select-sm" name="year" style="width: auto"
+              aria-label="Steuerjahr für Export">
+        <option value="">Alle Steuerjahre</option>
+        {% for y in export_years %}
+          <option value="{{ y }}">Steuerjahr {{ y }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-outline-primary btn-sm"
+              data-bs-toggle="tooltip" data-bs-placement="top"
+              title="CSV (Semikolon-getrennt) mit realisierten FIFO-Gewinnen, Jahresend-Beständen und Freigrenzen-Prüfung je Steuerjahr – als Unterlage für die Steuererklärung.">
+        <i class="bi bi-file-earmark-arrow-down"></i> FIFO-CSV exportieren
+      </button>
+    </form>
+    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Zurück
+    </a>
+  </div>
+</div>
+
+<div class="alert alert-light border small">
+  <i class="bi bi-lightbulb"></i>
+  <strong>So liest du diese Seite:</strong> Die App bewertet deine Bestände nach dem
+  <strong>FIFO-Prinzip</strong> (First-In-First-Out: älteste Käufe werden zuerst verkauft) auf Basis
+  der importierten Trade-Historie. Coins, die du länger als <strong>1 Jahr</strong> hältst, sind in
+  Deutschland <strong>steuerfrei</strong> verkaufbar – alles Jüngere ist steuerpflichtig (Freigrenze
+  600 €/Jahr). Die <em>Verkaufsempfehlungen</em> unten zeigen dir Chancen (steuerfrei verkaufen,
+  Kurshoch, Gewinnziel) und Risiken (Rebalancing, baldige Steuerfreiheit) – als Orientierung,
+  keine Anlageberatung. Mit <em>FIFO-CSV exportieren</em> erhältst du je Steuerjahr eine
+  Excel-geeignete Unterlage für die Steuererklärung.
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h2 class="h6 text-muted mb-1">Portfolio-Wert</h2>
+        <p class="h4 mb-0">{{ '{:,.2f}'.format(totals.value) }} €</p>
+        <small class="text-muted">Einstand (FIFO): {{ '{:,.2f}'.format(totals.basis) }} €</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h2 class="h6 text-muted mb-1">
+          Steuerfreier Gewinn
+          <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+             title="Gewinn aus Beständen, die länger als 1 Jahr gehalten wurden (steuerfrei bei Verkauf)."></i>
+        </h2>
+        <p class="h4 mb-0 {% if totals.taxfree_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+          {{ '{:+,.2f}'.format(totals.taxfree_profit) }} €
+        </p>
+        <small class="text-muted">Wert steuerfrei: {{ '{:,.2f}'.format(totals.taxfree_value) }} €</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h2 class="h6 text-muted mb-1">
+          Steuerpflichtiger Gewinn
+          <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+             title="Gewinn aus Beständen mit weniger als 1 Jahr Haltezeit – bei Verkauf jetzt steuerpflichtig (Freigrenze 600 € pro Jahr)."></i>
+        </h2>
+        <p class="h4 mb-0 {% if totals.taxable_profit >= 0 %}text-warning{% else %}text-success{% endif %}">
+          {{ '{:+,.2f}'.format(totals.taxable_profit) }} €
+        </p>
+        <small class="text-muted">Wert steuerpflichtig: {{ '{:,.2f}'.format(totals.taxable_value) }} €</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h2 class="h6 text-muted mb-1">
+          Freigrenze (600 €)
+          <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+             title="Gewinne aus Privatverkäufen bleiben bis 600 € pro Jahr steuerfrei – gilt erst ab Überschreitung (Freigrenze, keine Freibetragslogik)."></i>
+        </h2>
+        {% if totals.taxable_profit + realized_total.taxable > freigrenze %}
+          <p class="h4 mb-0 text-danger">{{ '{:+,.2f}'.format(totals.taxable_profit + realized_total.taxable) }} €</p>
+          <small class="text-danger">über der Freigrenze – Steuerzahlung droht</small>
+        {% else %}
+          <p class="h4 mb-0 text-success">{{ '{:+,.2f}'.format(totals.taxable_profit + realized_total.taxable) }} €</p>
+          <small class="text-muted">noch {{ '{:,.2f}'.format(freigrenze_left) }} € Spielraum</small>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if realized_total.taxfree or realized_total.taxable %}
+<div class="alert alert-light border small mb-4">
+  <i class="bi bi-check2-circle"></i>
+  Bereits realisierte Gewinne aus Verkäufen: steuerfrei <strong>{{ '{:+,.2f}'.format(realized_total.taxfree) }} €</strong>,
+  steuerpflichtig <strong>{{ '{:+,.2f}'.format(realized_total.taxable) }} €</strong>.
+</div>
+{% endif %}
+
+{% if year_summaries %}
+<h2 class="h4 mb-3">
+  Steuerjahr-Übersicht
+  <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+     title="Realisierte Gewinne und Verluste nach Steuerjahr. Freigrenze in Deutschland: 600 € pro Jahr – wird diese überschritten, muss der gesamte steuerpflichtige Gewinn versteuert werden."></i>
+</h2>
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="row g-3">
+      {% for ys in year_summaries %}
+      <div class="col-md-6 col-lg-4">
+        <div class="border rounded p-3 h-100">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h3 class="h5 mb-0">Steuerjahr {{ ys.year }}</h3>
+            {% if ys.freigrenze %}
+              <span class="badge text-bg-success">Freigrenze ok</span>
+            {% else %}
+              <span class="badge text-bg-danger">Freigrenze überschritten!</span>
+            {% endif %}
+          </div>
+          <div class="mb-2 d-flex" style="height: 24px; background: #e9ecef; border-radius: 4px; overflow: hidden;">
+            {% if ys.taxfree > 0 %}
+            <div style="width: {{ '%.1f'|format(ys.share_taxfree) }}%; background: #198754; min-width: 4px;"
+                 data-bs-toggle="tooltip" title="Steuerfrei: {{ '{:,.2f}'.format(ys.taxfree) }} €"></div>
+            {% endif %}
+            {% if ys.taxable > 0 %}
+            <div style="width: {{ '%.1f'|format(100.0 - ys.share_taxfree) }}%; background: #ffc107; min-width: 4px;"
+                 data-bs-toggle="tooltip" title="Steuerpflichtig: {{ '{:,.2f}'.format(ys.taxable) }} €"></div>
+            {% endif %}
+          </div>
+          <div class="d-flex justify-content-between small">
+            <span><i class="bi bi-circle-fill" style="color:#198754"></i> Steuerfrei: <strong>{{ '{:,.2f}'.format(ys.taxfree) }} €</strong></span>
+            <span><i class="bi bi-circle-fill" style="color:#ffc107"></i> Steuerpflichtig: <strong>{{ '{:,.2f}'.format(ys.taxable) }} €</strong></span>
+          </div>
+          <small class="text-muted">{{ ys.count }} Transaktion{{ 'en' if ys.count != 1 else '' }}</small>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if recommendations %}
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-header bg-white d-flex align-items-center gap-2 py-2">
+    <h2 class="h6 mb-0">
+      <i class="bi bi-lightning-charge-fill text-warning"></i> Verkaufsempfehlungen
+      <span class="badge text-bg-warning ms-1">{{ recommendations|length }}</span>
+    </h2>
+    <i class="bi bi-question-circle text-muted ms-auto" data-bs-toggle="tooltip" data-bs-placement="left"
+       title="Automatische Empfehlungen aus den Strategien 1 (steuerfrei verkaufen), 2 (Verkauf am Kurshoch), 3 (Rebalancing über 40 % Portfolioanteil) und 5 (bald ablaufende Haltefrist). Keine Anlage- oder Steuerberatung."></i>
+  </div>
+  <div class="card-body p-2 d-grid gap-2">
+    {% if not can_trade %}
+      <div class="alert alert-light border small py-1 px-2 mb-0">
+        <i class="bi bi-shield-lock"></i> Direktes Verkaufen ausgegraut: {{ trade_block_reason }}
+      </div>
+    {% endif %}
+    {% for rec in recommendations %}
+    <div class="alert alert-{{ rec.level }} py-2 px-3 mb-0 d-flex flex-wrap align-items-center gap-2">
+      <i class="bi {{ rec.icon }} fs-5"></i>
+      <div class="small flex-grow-1" style="min-width: 280px">
+        <strong>{{ rec.asset }}</strong> – {{ rec.text }}
+        <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+           title="{{ rec.tip }}"></i>
+      </div>
+      {% if can_trade and rec.qty %}
+      <form method="POST" action="{{ url_for('execute_sell') }}"
+            class="sell-form d-flex align-items-center gap-1 ms-auto"
+            data-asset="{{ rec.asset }}" data-qty="{{ rec.qty }}" data-price="{{ rec.price }}"
+            onsubmit="return confirmSell(this);">
+        <input type="hidden" name="asset" value="{{ rec.asset }}">
+        <label class="form-label mb-0 small text-nowrap">Verkaufen</label>
+        <div class="input-group input-group-sm" style="width: 170px">
+          <input type="number" name="percent" class="form-control" min="0.1" max="100" step="0.5"
+                 value="{{ '%.0f'|format(rec.sell_pct) if rec.sell_pct else 100 }}"
+                 aria-label="Prozent des Bestands">
+          <span class="input-group-text">%</span>
+        </div>
+        <button type="submit" class="btn btn-sm btn-outline-danger"
+                data-bs-toggle="tooltip" data-bs-placement="top"
+                title="Echte Bitvavo-Market-Order (mit Bestätigung im nächsten Schritt)">
+          <i class="bi bi-bag-dash"></i> Verkaufen
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="alert alert-light border small mb-4">
+  <i class="bi bi-lightning-charge"></i> Aktuell keine Verkaufsempfehlung
+  (ab {{ '{:,.0f}'.format(rec_min_value) }} € Positionswert).
+  <span class="text-muted d-block small">
+    Strategien: steuerfrei verkaufen bei Gewinn · Verkauf am 90-Tage-Hoch ·
+    Rebalancing über 40 % Portfolioanteil · bald ablaufende 1-Jahres-Frist.
+  </span>
+</div>
+{% endif %}
+
+<div class="d-flex flex-wrap gap-2 mb-3" id="portfolioFilter">
+  <button type="button" class="btn btn-sm btn-dark" data-filter="alle">Alle</button>
+  <button type="button" class="btn btn-sm btn-outline-success" data-filter="steuerfrei">Steuerfrei</button>
+  <button type="button" class="btn btn-sm btn-outline-danger" data-filter="steuerpflichtig">Steuerpflichtig</button>
+  <button type="button" class="btn btn-sm btn-outline-warning" data-filter="bald">Bald steuerfrei</button>
+  <button type="button" class="btn btn-sm btn-outline-secondary" data-filter="gemischt">Gemischt</button>
+</div>
+
+{% if rows %}
+<div class="table-responsive shadow-sm rounded">
+  <table class="table table-striped table-hover align-middle mb-0">
+    <thead class="table-dark">
+      <tr>
+        <th>Coin</th>
+        <th class="text-end">Menge</th>
+        <th class="text-end">
+          Einstand
+          <i class="bi bi-question-circle" data-bs-toggle="tooltip" data-bs-placement="top"
+             title="Durchschnittlicher Kaufpreis der noch gehaltenen Anteile nach FIFO, inkl. EUR-Gebühren."></i>
+        </th>
+        <th class="text-end">Kurs</th>
+        <th class="text-end">Wert</th>
+        <th class="text-end">Gewinn</th>
+        <th class="text-end">davon steuerfrei</th>
+        <th class="text-end">davon steuerpflichtig</th>
+        <th>Status</th>
+        <th>Empfehlung</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr data-status="{{ r.status }}">
+        <td><span class="badge text-bg-primary">{{ r.asset }}</span></td>
+        <td class="text-end">{{ '%.8g'|format(r.qty) }}</td>
+        <td class="text-end">{{ '%.6g'|format(r.basis / r.qty if r.qty else 0) }} €</td>
+        <td class="text-end">{{ '%.6g'|format(r.price) }} €</td>
+        <td class="text-end">{{ '{:,.2f}'.format(r.value) }} €</td>
+        <td class="text-end {% if r.profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+          {{ '{:+,.2f}'.format(r.profit) }} € ({{ '%+.1f'|format(r.profit_pct) }}%)
+        </td>
+        <td class="text-end text-success">{{ '{:+,.2f}'.format(r.taxfree_profit) }} €</td>
+        <td class="text-end text-warning">{{ '{:+,.2f}'.format(r.taxable_profit) }} €</td>
+        <td>
+          {% if r.status == 'steuerfrei' %}
+            <span class="badge text-bg-success">steuerfrei</span>
+          {% elif r.status == 'steuerpflichtig' %}
+            <span class="badge text-bg-danger">steuerpflichtig</span>
+          {% elif r.status == 'bald' %}
+            <span class="badge text-bg-warning">
+              bald steuerfrei{% if r.days_left is not none %} ({{ r.days_left }} T.){% endif %}
+            </span>
+          {% else %}
+            <span class="badge text-bg-secondary">gemischt</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if r.recs %}
+            <div class="d-flex flex-column gap-1 align-items-start">
+              {% for b in r.recs %}
+              <span class="badge text-bg-{{ b.color }} d-inline-flex align-items-center gap-1"
+                    data-bs-toggle="tooltip" data-bs-placement="top" title="{{ b.tip }}">
+                <i class="bi {{ b.icon }}"></i> {{ b.label }}
+              </span>
+              {% endfor %}
+            </div>
+          {% else %}
+            <span class="text-muted">–</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="alert alert-light border">
+  <i class="bi bi-inbox"></i> Keine Bestände – importiere zuerst deine
+  <a href="{{ url_for('trades_list') }}" class="alert-link">Trade-Historie</a>.
+</div>
+{% endif %}
+
+{% if unavailable %}
+<p class="text-muted small mt-3">
+  <i class="bi bi-info-circle"></i> Für {{ unavailable|join(', ') }} konnte kein aktueller Kurs geladen werden –
+  die Position wird nicht bewertet.
+</p>
+{% endif %}
+
+<div class="alert alert-secondary small mt-4">
+  <i class="bi bi-shield-exclamation"></i>
+  <strong>Kein Steuerberater-Tool:</strong> Es werden nur Käufe/Verkäufe aus der Bitvavo-Trade-Historie
+  berücksichtigt (FIFO je Coin, Gebühren in EUR enthalten). Einzahlungen, Auszahlungen, Staking-Erträge,
+  Transfers und Freibeträge anderer Art fließen nicht ein. Die Haltefrist beträgt {{ tax_free_days }} Tage;
+  Verkäufe in den letzten {{ maturity_notice_days }} Tagen vor Fristende werden markiert. Bitte für eine
+  verbindliche Aussage einen Steuerberater konsultieren.
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const buttons = document.querySelectorAll('#portfolioFilter button');
+  const rows = document.querySelectorAll('tbody tr[data-status]');
+  buttons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const filter = btn.dataset.filter;
+      buttons.forEach(function (b) {
+        b.classList.remove('btn-dark', 'btn-outline-success', 'btn-outline-danger', 'btn-outline-warning', 'btn-outline-secondary');
+        b.classList.add('btn-outline-dark');
+      });
+      btn.classList.remove('btn-outline-dark');
+      btn.classList.add('btn-dark');
+      rows.forEach(function (row) {
+        row.style.display = (filter === 'alle' || row.dataset.status === filter) ? '' : 'none';
+      });
+    });
+  });
+});
+
+function confirmSell(form) {
+  const pct = parseFloat(form.querySelector('input[name=percent]').value);
+  if (!(pct > 0 && pct <= 100)) {
+    alert('Bitte einen Anteil zwischen 0 und 100 % eingeben.');
+    return false;
+  }
+  const qty = parseFloat(form.dataset.qty);
+  const price = parseFloat(form.dataset.price);
+  const amount = qty * pct / 100;
+  const amountTxt = amount.toLocaleString('de-DE', { maximumFractionDigits: 8 });
+  const approx = price && price > 0
+    ? '≈ ' + (price * amount).toLocaleString('de-DE', { maximumFractionDigits: 2 }) + ' €'
+    : '(Kurs unbekannt)';
+  return confirm(form.dataset.asset + ': ' + pct + ' % des Bestands (~ ' + amountTxt
+    + ' Coins, ' + approx + ') als ECHTE Bitvavo-Market-Order verkaufen?');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Anmeldung – Bitvavo-Autobot{% endblock %}
+{% block navbar %}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5 col-lg-4">
+    <div class="card shadow-sm mt-5">
+      <div class="card-body p-4">
+        <h1 class="h4 text-center mb-4">
+          <i class="bi bi-shield-lock"></i> Bitvavo-Autobot Anmeldung
+        </h1>
+        <form method="POST" action="{{ url_for('do_login') }}" id="loginForm">
+          <div class="mb-3">
+            <label for="password" class="form-label">Passwort</label>
+            <input type="password" class="form-control" id="password" name="password"
+                   autofocus required autocomplete="current-password">
+          </div>
+          <div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="remember" name="remember">
+              <label class="form-check-label" for="remember" data-bs-toggle="tooltip"
+                     title="Das Passwort wird verschlüsselt (AES-GCM) im Browser gespeichert und beim nächsten Besuch automatisch eingeloggt. Beim Abmelden wird es gelöscht.">
+                Angemeldet bleiben
+              </label>
+            </div>
+            <small class="text-muted" id="rememberHint" style="display:none;">
+              <i class="bi bi-info-circle"></i> Passwort wird verschlüsselt gespeichert.
+            </small>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-box-arrow-in-right"></i> Login
+          </button>
+        </form>
+        <p class="text-muted small text-center mt-3 mb-0">
+          Über die Umgebungsvariable <code>MASTER_PASSWORD</code> konfigurierbar.
+        </p>
+        <p class="text-muted small text-center mb-0" id="secureContextHint" style="display:none;">
+          <i class="bi bi-exclamation-triangle"></i>
+          Verschlüsseltes Speichern erfordert HTTPS oder localhost – hier wird nur die
+          Session im Browser gehalten.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+  const STORE_KEY = 'bitvavo_remember_login';
+  const PEPPER = '{{ login_pepper }}';
+  const form = document.getElementById('loginForm');
+  const passwordInput = document.getElementById('password');
+  const rememberCheck = document.getElementById('remember');
+  const hint = document.getElementById('rememberHint');
+  const contextHint = document.getElementById('secureContextHint');
+
+  const subtle = window.crypto && window.crypto.subtle;
+  const canStore = function () { return !!(window.isSecureContext && subtle); };
+  if (!canStore()) {
+    contextHint.style.display = '';
+    rememberCheck.addEventListener('change', function () {
+      if (rememberCheck.checked) rememberCheck.checked = false;
+    });
+    return; // kein Auto-Login ohne WebCrypto
+  }
+
+  function hexToBytes(hex) {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+    return bytes;
+  }
+  function bytesToHex(bytes) {
+    return Array.from(bytes).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+  }
+  function getKey(saltBytes) {
+    const enc = new TextEncoder();
+    return crypto.subtle.importKey('raw', enc.encode(PEPPER), 'PBKDF2', false, ['deriveKey'])
+      .then(function (baseKey) {
+        return crypto.subtle.deriveKey(
+          { name: 'PBKDF2', salt: saltBytes, iterations: 100000, hash: 'SHA-256' },
+          baseKey,
+          { name: 'AES-GCM', length: 256 },
+          false,
+          ['encrypt', 'decrypt']
+        );
+      });
+  }
+  function savePassword(pw) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    return getKey(salt).then(function (key) {
+      return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(pw));
+    }).then(function (ct) {
+      localStorage.setItem(STORE_KEY, JSON.stringify({
+        v: 1,
+        salt: bytesToHex(salt),
+        iv: bytesToHex(iv),
+        ct: bytesToHex(new Uint8Array(ct))
+      }));
+      return true;
+    }).catch(function () { return false; });
+  }
+  function loadPassword() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return Promise.resolve(null);
+      const data = JSON.parse(raw);
+      if (!data.salt || !data.iv || !data.ct) return Promise.resolve(null);
+      return getKey(hexToBytes(data.salt)).then(function (key) {
+        return crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: hexToBytes(data.iv) }, key, hexToBytes(data.ct)
+        );
+      }).then(function (pt) {
+        return new TextDecoder().decode(pt);
+      }).catch(function () {
+        localStorage.removeItem(STORE_KEY); // nicht mehr entschlüsselbar -> verwerfen
+        return null;
+      });
+    } catch (e) {
+      return Promise.resolve(null);
+    }
+  }
+
+  // Beim Absenden (mit Haken) das Passwort verschlüsselt speichern – der Request läuft normal weiter
+  form.addEventListener('submit', function () {
+    if (rememberCheck.checked && passwordInput.value) {
+      savePassword(passwordInput.value);
+      hint.style.display = '';
+    } else if (!rememberCheck.checked) {
+      localStorage.removeItem(STORE_KEY);
+    }
+  });
+
+  // Auto-Login: gespeichertes Passwort entschlüsseln und Formular absenden
+  loadPassword().then(function (pw) {
+    if (!pw) return;
+    // Falls der letzte Auto-Login fehlschlug (falsches Passwort), dem User die Wahl lassen
+    if (document.querySelector('.alert-danger')) {
+      localStorage.removeItem(STORE_KEY);
+      passwordInput.placeholder = 'Passwort';
+      return;
+    }
+    passwordInput.value = pw;
+    rememberCheck.checked = true;
+    hint.style.display = '';
+    form.submit();
+  });
+})();
+</script>
+{% endblock %}

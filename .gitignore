@@ -1,0 +1,19 @@
+# Sensible/örtliche Dateien
+.env
+.env.local
+data/*
+!.gitkeep
+*.db
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv
+.venv/
+
+# macOS
+.DS_Store
+
+# Screenshots (werden nur lokal verwaltet, ggf. als Kitap-Ressource)
+screen/*.png

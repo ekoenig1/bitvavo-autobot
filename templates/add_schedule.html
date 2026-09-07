@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+{% block title %}Neuen Zeitplan anlegen – Bitvavo-Autobot{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-9">
+    <h1 class="h3 mb-1"><i class="bi bi-calendar-plus"></i> Neuen Zeitplan anlegen</h1>
+    <p class="text-muted mb-4">
+      Ein Zeitplan investiert automatisch in feste Abständen – dein „Sparplan" für Kryptowährungen.
+      In 3 Schritten eingerichtet, danach macht der Bot alles selbst.
+    </p>
+
+    <!-- Fortschrittsanzeige -->
+    <ol class="list-unstyled d-flex gap-2 mb-4 step-indicator">
+      <li class="step-dot active" data-step="1">1. Was kaufen?</li>
+      <li class="step-dot" data-step="2">2. Wann kaufen?</li>
+      <li class="step-dot" data-step="3">3. Sicherheitsregeln</li>
+    </ol>
+
+    <form id="scheduleForm" method="POST" class="card shadow-sm">
+      <div class="card-body">
+
+        <!-- ============ SCHRITT 1: Positionen ============ -->
+        <div class="wizard-step" id="step1">
+          <div class="alert alert-light border small">
+            <i class="bi bi-lightbulb"></i>
+            <strong>So funktioniert ein Sparplan:</strong> Du legst fest, <em>welche Coins</em> du
+            <em>in welchem Betrag</em> kaufen möchtest. Zum Termin kauft der Bot automatisch für
+            dich – z. B. jeden Montag 50 € BTC. So investierst du regelmäßig, ohne jeden Tag
+            dranzudenken (<em>Dollar-Cost-Averaging</em>).
+          </div>
+
+          <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+              <h2 class="h6 mb-2">
+                Coin auswählen
+                <span class="badge text-bg-primary ms-1" id="coinCount">0</span>
+              </h2>
+              <p class="text-muted small mb-3">
+                Alle handelbaren Coins auf Bitvavo (live aus der öffentlichen API, mit aktuellem
+                Kurs). Suchfeld zum Filtern – z.&nbsp;B. „bitcoin“ oder „eth“. Dann Coin wählen,
+                Betrag eintragen und auf <strong>Hinzufügen</strong> klicken.
+              </p>
+              <div class="row g-2">
+                <div class="col-md-5">
+                  <input type="text" class="form-control" id="coinSearch"
+                         placeholder="🔍 Coin suchen, z. B. Bitcoin, ETH, SOL…"
+                         aria-label="Coin suchen">
+                </div>
+                <div class="col-md-7">
+                  <select class="form-select" id="coinSelect" size="8"
+                          aria-label="Coin auswählen">
+                    <!-- Optionen per JavaScript -->
+                  </select>
+                </div>
+              </div>
+              <div class="row g-2 mt-1">
+                <div class="col-md-5">
+                  <input type="number" step="0.01" min="0" class="form-control" id="amountInput"
+                         placeholder="Betrag pro Kauf (EUR), z. B. 50"
+                         aria-label="Betrag pro Kauf in EUR">
+                </div>
+                <div class="col-md-7 d-flex gap-2">
+                  <button type="button" class="btn btn-primary" id="addFromPicker">
+                    <i class="bi bi-plus-circle"></i> Hinzufügen
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary" id="clearRows" title="Alle Positionen entfernen">
+                    <i class="bi bi-eraser"></i> Alles leeren
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h2 class="h6 mb-2">Deine Positionen</h2>
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th class="w-50">Coin</th>
+                  <th>Betrag pro Kauf (EUR)</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="rowsBody">
+                <!-- Zeilen werden per JavaScript gefüllt -->
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="addRow">
+            <i class="bi bi-plus-circle"></i> Weitere Position hinzufügen
+          </button>
+          <span class="text-muted small ms-2">bis zu 5 Positionen</span>
+
+          <div class="alert alert-warning py-2 small d-none" id="rowError">
+            <i class="bi bi-exclamation-triangle"></i> Bitte mindestens eine Position mit Coin und
+            Betrag (größer 0) angeben.
+          </div>
+        </div>
+
+        <!-- ============ SCHRITT 2: Termin ============ -->
+        <div class="wizard-step d-none" id="step2">
+          <div class="alert alert-light border small">
+            <i class="bi bi-lightbulb"></i>
+            <strong>Wann kauft der Bot?</strong> Zum gewählten Wochentag und Uhrzeit führt er alle
+            Positionen dieses Plans aus. Danach geht es automatisch weiter – jede Woche zur selben
+            Zeit.
+          </div>
+          <div class="row g-4">
+            <div class="col-md-6">
+              <label class="form-label" for="weekday">Wochentag</label>
+              <select id="weekday" name="weekday" class="form-select">
+                {% set de_days = {'Monday':'Montag','Tuesday':'Dienstag','Wednesday':'Mittwoch','Thursday':'Donnerstag','Friday':'Freitag','Saturday':'Samstag','Sunday':'Sonntag'} %}
+                {% for eng, deu in de_days.items() %}
+                  <option value="{{ eng }}" {% if eng == default_day %}selected{% endif %}>{{ deu }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Der Wochentag, an dem gekauft werden soll.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="time_of_day">Uhrzeit</label>
+              <input type="time" class="form-control" id="time_of_day" name="time_of_day" value="{{ default_time }}">
+              <div class="form-text">Z. B. <code>09:00</code> = morgens um 9 Uhr.</div>
+            </div>
+          </div>
+          <div class="mt-3 p-3 bg-light border rounded small" id="termPreview">
+            <i class="bi bi-hourglass-split"></i>
+            <strong>Dein Plan:</strong> <span id="termPreviewText">–</span>
+          </div>
+        </div>
+
+        <!-- ============ SCHRITT 3: Regeln (optional) ============ -->
+        <div class="wizard-step d-none" id="step3">
+          <div class="alert alert-light border small">
+            <i class="bi bi-lightbulb"></i>
+            <strong>Sicherheitsregeln (optional):</strong> Damit der Bot nur zu günstigen Kursen
+            kauft. Leere Felder = keine Einschränkung. Du kannst alles auch später ändern.
+          </div>
+
+          <div class="row g-4">
+            <div class="col-md-6">
+              <label class="form-label" for="rule_max_price">Höchstpreis pro Coin (EUR)</label>
+              <input type="number" step="0.01" min="0" id="rule_max_price" name="rule_max_price"
+                     class="form-control" placeholder="z. B. 65.000">
+              <div class="form-text">
+                <i class="bi bi-info-circle"></i> Kauf nur, wenn der Kurs <strong>unter</strong>
+                diesem Preis liegt. Schützt vor teuren Käufen nach plötzlichen Kurssprüngen.
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="rule_ath_dip_pct">Mindestabstand zum Allzeithoch (%)</label>
+              <input type="number" step="0.1" min="0" id="rule_ath_dip_pct" name="rule_ath_dip_pct"
+                     class="form-control" placeholder="z. B. 10">
+              <div class="form-text">
+                <i class="bi bi-info-circle"></i> Kauf nur bei einem Kurs-Dip: Der Preis muss
+                mindestens X % <strong>unter</strong> dem Höchststand der letzten 90 Tage liegen.
+                Beispiel: <code>10</code> = erst kaufen, wenn der Kurs ≥ 10 % gefallen ist.
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="rule_sma">Kurs unter gleitendem Mittel (Trend)</label>
+              <select id="rule_sma" name="rule_sma" class="form-select">
+                <option value="off">Aus (keine Einschränkung)</option>
+                <option value="below_sma9">Kurs unter 9-Tage-Mittel (kurzfristig günstig)</option>
+                <option value="below_sma50">Kurs unter 50-Tage-Mittel (langfristig günstig)</option>
+              </select>
+              <div class="form-text">
+                <i class="bi bi-info-circle"></i> Kauf nur, wenn der aktuelle Kurs unter dem
+                Durchschnitt der letzten 9 bzw. 50 Tage liegt – du kaufst dann „im Abschwung"
+                statt in der Euphorie.
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="rule_rsi_min">RSI-Band (Marktstimmung)</label>
+              <div class="d-flex gap-2 align-items-center">
+                <input type="number" step="1" min="0" max="100" id="rule_rsi_min" name="rule_rsi_min"
+                       class="form-control" placeholder="von, z. B. 30">
+                <span>bis</span>
+                <input type="number" step="1" min="0" max="100" id="rule_rsi_max" name="rule_rsi_max"
+                       class="form-control" placeholder="bis, z. B. 70">
+              </div>
+              <div class="form-text">
+                <i class="bi bi-info-circle"></i> Der RSI (0–100) zeigt, ob ein Coin gerade
+                „überverkauft" (unter 30, eher günstig) oder „überkauft" (über 70, eher teuer) ist.
+                Nur kaufen, wenn der RSI im eingestellten Bereich liegt. Feld frei lassen = egal.
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="rule_max_invest">Max. gesamt investieren pro Coin (EUR)</label>
+              <input type="number" step="0.01" min="0" id="rule_max_invest" name="rule_max_invest"
+                     class="form-control" placeholder="z. B. 1000">
+              <div class="form-text">
+                <i class="bi bi-info-circle"></i> Stoppt den Sparplan für einen Coin, sobald die
+                Summe <strong>aller Käufe</strong> dieses Coins diesen Betrag erreicht hat – dein
+                Risiko bleibt begrenzt.
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 p-3 bg-light border rounded small">
+            <i class="bi bi-clipboard-check"></i>
+            <strong>Zusammenfassung:</strong> <span id="summaryText">–</span>
+          </div>
+
+          <div class="d-none mt-3" id="previewArea">
+            <div class="card border-info shadow-sm">
+              <div class="card-header bg-info bg-opacity-10 fw-semibold">
+                <i class="bi bi-eye"></i> Vorschau – Die nächsten 3 Käufe
+              </div>
+              <div class="card-body" id="previewResults">
+                <div class="text-muted"><i class="bi bi-hourglass-split"></i> Lade Vorschau...</div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3">
+            <button type="button" class="btn btn-outline-info" id="previewBtn">
+              <i class="bi bi-eye"></i> Vorschau anzeigen
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-footer d-flex justify-content-between align-items-center">
+        <button type="button" class="btn btn-outline-secondary" id="prevBtn" style="visibility: hidden">
+          <i class="bi bi-arrow-left"></i> Zurück
+        </button>
+        <button type="button" class="btn btn-primary" id="nextBtn">
+          Weiter <i class="bi bi-arrow-right"></i>
+        </button>
+        <button type="submit" class="btn btn-success d-none" id="submitBtn">
+          <i class="bi bi-check-lg"></i> Zeitplan speichern
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+  const ASSETS = {{ allowed_assets|tojson }};
+  const NAMES = {
+    {% for t in top_assets %}{{ t.symbol|tojson }}: {{ t.name|tojson }},
+    {% endfor %}
+  };
+  const PRICES = {
+    {% for t in top_assets %}{{ t.symbol|tojson }}: {{ t.price }},
+    {% endfor %}
+  };
+  const DAYS = {
+    'Monday': 'Montag', 'Tuesday': 'Dienstag', 'Wednesday': 'Mittwoch',
+    'Thursday': 'Donnerstag', 'Friday': 'Freitag', 'Saturday': 'Samstag', 'Sunday': 'Sonntag'
+  };
+  const MAX_ROWS = 5;
+  const rowsBody = document.getElementById('rowsBody');
+  const rowError = document.getElementById('rowError');
+
+  // Live-DOM als einzige Wahrheitsquelle – kein separates rows-Array,
+  // damit entfernte/bereinigte Zeilen nie verwaiste Referenzen hinterlassen.
+  function liveRows() {
+    return Array.prototype.slice.call(rowsBody.querySelectorAll('tr'));
+  }
+
+  function symLabel(sym) {
+    return sym + (NAMES[sym] ? ' – ' + NAMES[sym] : '');
+  }
+
+  function fmtPrice(p) {
+    if (!isFinite(p) || p <= 0) return '–';
+    if (p >= 1) return p.toLocaleString('de-DE', { maximumFractionDigits: 2 });
+    if (p >= 0.0001) return p.toFixed(6).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+    return p.toPrecision(4);
+  }
+
+  function rowTemplate(asset, amount) {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><select name="asset" class="form-select asset-sel">' +
+        '<option value="">-- Coin wählen --</option>' +
+        ASSETS.map(function (a) {
+          return '<option value="' + a + '">' + symLabel(a) + '</option>';
+        }).join('') +
+      '</select></td>' +
+      '<td><input type="number" step="0.01" min="0" name="amount_eur" class="form-control amount-inp" ' +
+        'placeholder="z. B. 50"></td>' +
+      '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger rm-row">' +
+        '<i class="bi bi-x-lg"></i></button></td>';
+    const sel = tr.querySelector('.asset-sel');
+    const inp = tr.querySelector('.amount-inp');
+    if (asset) sel.value = asset;
+    if (amount) inp.value = amount;
+    tr.querySelector('.rm-row').addEventListener('click', function () {
+      tr.remove();
+      syncUI();
+    });
+    rowsBody.appendChild(tr);
+    return tr;
+  }
+
+  // Leere Zeilen (weder Coin noch Betrag) entfernen – außer die letzte Zeile:
+  // sie dient als frische Eingabezeile für den nächsten Eintrag.
+  function pruneEmptyRows() {
+    const live = liveRows();
+    if (live.length <= 1) return;
+    const last = live[live.length - 1];
+    live.forEach(function (tr) {
+      if (tr === last) return;
+      const sel = tr.querySelector('.asset-sel');
+      const inp = tr.querySelector('.amount-inp');
+      if (sel && !sel.value && (!inp || !inp.value)) tr.remove();
+    });
+  }
+
+  function addRow(asset, amount) {
+    pruneEmptyRows();
+    if (liveRows().length >= MAX_ROWS) {
+      alert('Maximal ' + MAX_ROWS + ' Positionen pro Zeitplan möglich.');
+      return;
+    }
+    const tr = rowTemplate(asset || '', amount || '');
+    if (asset) {
+      const tmp = tr; // Fokus auf Betrag, damit direkt getippt werden kann
+      setTimeout(function () { tmp.querySelector('.amount-inp').focus(); }, 0);
+    }
+    syncUI();
+  }
+
+  // ---- Coin-Auswahl (Dropdown mit allen handelbaren Coins) ----
+  function populateSelect() {
+    const sel = document.getElementById('coinSelect');
+    sel.innerHTML = '';
+    const assets = ASSETS.slice().sort();
+    assets.forEach(function (sym) {
+      const o = document.createElement('option');
+      o.value = sym;
+      o.textContent = symLabel(sym) + (PRICES[sym] ? ' – ' + fmtPrice(PRICES[sym]) + ' €' : '');
+      sel.appendChild(o);
+    });
+    document.getElementById('coinCount').textContent = assets.length;
+  }
+
+  function filterSelect() {
+    const q = (document.getElementById('coinSearch').value || '').toLowerCase().trim();
+    let visible = 0;
+    document.querySelectorAll('#coinSelect option').forEach(function (o) {
+      const show = !q || o.textContent.toLowerCase().indexOf(q) !== -1;
+      o.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    document.getElementById('coinCount').textContent = visible;
+    const sel = document.getElementById('coinSelect');
+    if (visible > 0 && (!sel.value || sel.selectedOptions[0].style.display === 'none')) {
+      const first = Array.prototype.find.call(sel.options, function (o) { return o.style.display !== 'none'; });
+      if (first) sel.value = first.value;
+    }
+  }
+
+  function addFromPicker() {
+    const sel = document.getElementById('coinSelect');
+    const amt = parseFloat(document.getElementById('amountInput').value);
+    let sym = sel.value;
+    if (!sym) {
+      const vis = Array.prototype.find.call(sel.options, function (o) { return o.style.display !== 'none'; });
+      if (vis) sym = vis.value;
+    }
+    if (!sym) { alert('Bitte zuerst einen Coin wählen.'); return; }
+    if (!(amt > 0)) { alert('Bitte einen Betrag größer 0 eintragen.'); return; }
+    addRow(sym, String(amt));
+    document.getElementById('amountInput').value = '';
+    updateSummaries();
+  }
+
+  function syncUI() {
+    pruneEmptyRows();
+    document.getElementById('addRow').disabled = liveRows().length >= MAX_ROWS;
+    updateSummaries();
+  }
+
+  function stepRows() {
+    return Array.prototype.map.call(document.querySelectorAll('#rowsBody tr'), function (tr) {
+      return {
+        asset: tr.querySelector('.asset-sel').value,
+        amount: parseFloat(tr.querySelector('.amount-inp').value) || 0
+      };
+    });
+  }
+
+  function validateStep1() {
+    const sr = stepRows();
+    const ok = sr.some(function (r) { return r.asset && r.amount > 0; });
+    rowError.classList.toggle('d-none', ok);
+    return ok;
+  }
+
+  let step = 1;
+  function showStep(n) {
+    step = n;
+    document.querySelectorAll('.wizard-step').forEach(function (el, i) { el.classList.toggle('d-none', i !== n - 1); });
+    document.querySelectorAll('.step-dot').forEach(function (el) {
+      el.classList.toggle('active', parseInt(el.dataset.step, 10) <= n);
+    });
+    document.getElementById('prevBtn').style.visibility = n === 1 ? 'hidden' : 'visible';
+    document.getElementById('nextBtn').classList.toggle('d-none', n === 3);
+    document.getElementById('submitBtn').classList.toggle('d-none', n !== 3);
+    updateSummaries();
+  }
+
+  function updateSummaries() {
+    const sr = stepRows().filter(function (r) { return r.asset && r.amount > 0; });
+    // Schritt 2-Vorschau
+    const day = DAYS[document.getElementById('weekday').value] || '?';
+    const time = document.getElementById('time_of_day').value || '?';
+    const termParts = sr.length
+      ? sr.map(function (r) { return r.amount.toLocaleString('de-DE') + ' € ' + r.asset; }).join(', ')
+      : '– noch keine Positionen –';
+    document.getElementById('termPreviewText').textContent =
+      'Jeden ' + day.toLowerCase() + ' um ' + time + ' Uhr kauft der Bot: ' + termParts + '.';
+
+    // Schritt 3-Zusammenfassung
+    const rules = [];
+    const mp = document.getElementById('rule_max_price').value;
+    const dip = document.getElementById('rule_ath_dip_pct').value;
+    const sma = document.getElementById('rule_sma').value;
+    const rmin = document.getElementById('rule_rsi_min').value;
+    const rmax = document.getElementById('rule_rsi_max').value;
+    const inv = document.getElementById('rule_max_invest').value;
+    if (mp) rules.push('max. ' + mp + ' € pro Coin');
+    if (dip) rules.push('nur bei ≥ ' + dip + '% unter ATH');
+    if (sma === 'below_sma9') rules.push('Kurs unter SMA9');
+    if (sma === 'below_sma50') rules.push('Kurs unter SMA50');
+    if (rmin || rmax) rules.push('RSI ' + (rmin || '–') + ' bis ' + (rmax || '–'));
+    if (inv) rules.push('max. ' + inv + ' € Gesamt pro Coin');
+    const posText = sr.length
+      ? sr.map(function (r) { return r.asset + ' (' + r.amount.toLocaleString('de-DE') + ' €)'; }).join(', ')
+      : 'keine Positionen';
+    const ruleText = rules.length ? rules.join('; ') : 'keine (es darf immer gekauft werden)';
+    document.getElementById('summaryText').textContent =
+      'Jeden ' + day.toLowerCase() + ' um ' + time + ' Uhr: ' + posText + '. Regeln: ' + ruleText + '.';
+  }
+
+  // ---- Vorschau: nächste 3 Käufe simulieren ----
+  function loadPreview() {
+    const sr = stepRows().filter(function (r) { return r.asset && r.amount > 0; });
+    if (sr.length === 0) { alert('Bitte zuerst mindestens eine Position angeben.'); return; }
+    const area = document.getElementById('previewArea');
+    const results = document.getElementById('previewResults');
+    area.classList.remove('d-none');
+    results.innerHTML = '<div class="text-muted"><i class="bi bi-hourglass-split"></i> Lade Vorschau...</div>';
+    const body = JSON.stringify({
+      weekday: document.getElementById('weekday').value,
+      time: document.getElementById('time_of_day').value,
+      lines: sr.map(function (r) { return { asset: r.asset, amount_eur: r.amount }; }),
+      rules: {
+        max_price: parseFloat(document.getElementById('rule_max_price').value) || 0,
+        ath_dip_pct: parseFloat(document.getElementById('rule_ath_dip_pct').value) || 0,
+        sma: document.getElementById('rule_sma').value || 'off',
+        rsi_min: parseFloat(document.getElementById('rule_rsi_min').value) || 0,
+        rsi_max: parseFloat(document.getElementById('rule_rsi_max').value) || 0,
+        max_invest: parseFloat(document.getElementById('rule_max_invest').value) || 0
+      }
+    });
+    fetch('/schedule_preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
+      .then(function (r) { return r.json(); })
+      .then(function (items) {
+        if (items.error) { results.innerHTML = '<div class="text-danger">' + items.error + '</div>'; return; }
+        if (!items.length) { results.innerHTML = '<div class="text-muted">Keine Daten verfügbar.</div>'; return; }
+        let html = '<div class="table-responsive"><table class="table table-sm align-middle mb-0">';
+        html += '<thead><tr><th>Datum</th><th>Coin</th><th>Betrag</th><th>Preis</th><th>Geschätzte Menge</th><th>Regel</th></tr></thead><tbody>';
+        items.forEach(function (it) {
+          const badge = it.rule_ok
+            ? '<span class="badge text-bg-success"><i class="bi bi-check"></i> Kauf</span>'
+            : '<span class="badge text-bg-warning" title="' + (it.rule_reason || '') + '"><i class="bi bi-x"></i> Übersprungen</span>';
+          html += '<tr>'
+            + '<td>' + it.day_name + ', ' + it.date + '</td>'
+            + '<td><span class="badge text-bg-primary">' + symLabel(it.asset) + '</span></td>'
+            + '<td>' + Number(it.amount_eur).toFixed(2) + ' €</td>'
+            + '<td>' + (it.price > 0 ? Number(it.price).toFixed(4) + ' €' : '–') + '</td>'
+            + '<td>' + (it.est_qty > 0 ? Number(it.est_qty).toFixed(8) : '–') + '</td>'
+            + '<td>' + badge + '</td>'
+            + '</tr>';
+        });
+        html += '</tbody></table></div>';
+        results.innerHTML = html;
+      })
+      .catch(function (e) {
+        results.innerHTML = '<div class="text-danger">Fehler: ' + e.message + '</div>';
+      });
+  }
+
+  // Events
+  document.getElementById('addRow').addEventListener('click', function () { addRow(); });
+  document.getElementById('clearRows').addEventListener('click', function () {
+    if (liveRows().length > 0 && !confirm('Alle Positionen entfernen?')) return;
+    document.querySelectorAll('#rowsBody tr').forEach(function (tr) { tr.remove(); });
+    syncUI();
+  });
+  document.getElementById('addFromPicker').addEventListener('click', addFromPicker);
+  document.getElementById('coinSearch').addEventListener('input', filterSelect);
+  document.getElementById('previewBtn').addEventListener('click', loadPreview);
+  document.getElementById('weekday').addEventListener('change', updateSummaries);
+  document.getElementById('time_of_day').addEventListener('input', updateSummaries);
+  ['rule_max_price', 'rule_ath_dip_pct', 'rule_sma', 'rule_rsi_min', 'rule_rsi_max', 'rule_max_invest']
+    .forEach(function (id) {
+      document.getElementById(id).addEventListener('input', updateSummaries);
+    });
+
+  document.getElementById('nextBtn').addEventListener('click', function () {
+    if (step === 1 && !validateStep1()) return;
+    showStep(step + 1);
+  });
+  document.getElementById('prevBtn').addEventListener('click', function () { showStep(step - 1); });
+
+  document.getElementById('scheduleForm').addEventListener('submit', function (e) {
+    if (!validateStep1()) { e.preventDefault(); showStep(1); return false; }
+  });
+
+  // Initialzustand: Coin-Dropdown füllen + 1 leere Zeile
+  populateSelect();
+  filterSelect();
+  addRow();
+  showStep(1);
+})();
+</script>
+{% endblock %}

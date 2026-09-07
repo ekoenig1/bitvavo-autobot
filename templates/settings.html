@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+{% block title %}Einstellungen – Bitvavo-Autobot{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3"><i class="bi bi-gear"></i> Einstellungen</h1>
+
+<div class="alert alert-light border small mb-4">
+  <i class="bi bi-lightbulb"></i>
+  <strong>Was gehört wohin?</strong> Drei Bereiche:
+  <strong>Bitvavo-API</strong> – deine Zugangsdaten (Key + Secret, wird verschlüsselt gespeichert);
+  <strong>E-Mail</strong> – Benachrichtigungen, wenn der Bot kauft oder etwas schiefgeht;
+  <strong>Verkaufsempfehlungen</strong> – wann die App dir einen Verkauf vorschlägt.
+  Alles ist optional außer dem API-Key, den du für Import, Kontostand und automatische Käufe brauchst.
+</div>
+
+<ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="api-tab" data-bs-toggle="tab" data-bs-target="#api-pane"
+            type="button" role="tab" aria-controls="api-pane" aria-selected="true">
+      <i class="bi bi-key"></i> Bitvavo-API
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="mail-tab" data-bs-toggle="tab" data-bs-target="#mail-pane"
+            type="button" role="tab" aria-controls="mail-pane" aria-selected="false">
+      <i class="bi bi-envelope"></i> E-Mail
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="strat-tab" data-bs-toggle="tab" data-bs-target="#strat-pane"
+            type="button" role="tab" aria-controls="strat-pane" aria-selected="false">
+      <i class="bi bi-lightning-charge"></i> Verkaufsempfehlungen
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="onb-tab" data-bs-toggle="tab" data-bs-target="#onb-pane"
+            type="button" role="tab" aria-controls="onb-pane" aria-selected="false">
+      <i class="bi bi-rocket-takeoff"></i> Onboarding
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <!-- ===================== API-Tab ===================== -->
+  <div class="tab-pane fade show active" id="api-pane" role="tabpanel" aria-labelledby="api-tab">
+    <form method="POST" class="card shadow-sm mb-4">
+      <div class="card-header fw-semibold"><i class="bi bi-key"></i> API-Key &amp; Secret</div>
+      <div class="card-body">
+        {% if api_secret_missing %}
+        <div class="alert alert-danger py-2 small">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <strong>API-Secret fehlt!</strong> Es ist nur der API-Key hinterlegt. Bitvavo zeigt das
+          Secret nur <strong>einmal</strong> bei der Erstellung des Keys an – lege in der Bitvavo-App
+          einen <strong>neuen API-Key</strong> an und trage Key UND Secret hier ein. Ohne Secret
+          schlagen alle privaten API-Aufrufe fehl (Fehler 309).
+        </div>
+        {% endif %}
+        {% if api_permissions %}
+        <div class="alert alert-success py-2 small">
+          <i class="bi bi-shield-check"></i> <strong>Key-Berechtigungen:</strong>
+          <span class="badge {% if api_permissions.trading %}text-bg-danger{% else %}text-bg-success{% endif %}">
+            Handel: {{ 'erlaubt' if api_permissions.trading else 'gesperrt' }}
+          </span>
+          <span class="badge {% if api_permissions.withdrawal %}text-bg-danger{% else %}text-bg-success{% endif %}">
+            Auszahlung: {{ 'erlaubt' if api_permissions.withdrawal else 'gesperrt' }}
+          </span>
+          {% if not api_permissions.trading %}
+            <span class="text-muted">Read-only-Key – sicher für den Testbetrieb.</span>
+          {% else %}
+            <span class="text-muted">Dieser Key kann echte Orders platzieren!</span>
+          {% endif %}
+        </div>
+        {% elif api_permission_error %}
+        <div class="alert alert-warning py-2 small">
+          <i class="bi bi-shield-exclamation"></i> {{ api_permission_error }}
+        </div>
+        {% endif %}
+        {% if mask_key %}
+          <p class="text-muted small mb-1">
+            <i class="bi bi-check-circle-fill text-success"></i> Aktueller API-Key (maskiert):
+            <code>{{ mask_key }}</code>
+          </p>
+          <p class="text-muted small">Aktuelles Secret (maskiert): <code>{{ mask_secret }}</code></p>
+        {% else %}
+          <p class="text-muted small">
+            <i class="bi bi-info-circle"></i> Es sind noch keine Credentials hinterlegt.
+            Trage hier deinen Bitvavo-API-Key und das Secret ein.
+          </p>
+        {% endif %}
+        {% if secret_error %}
+          <div class="alert alert-danger py-2 small">
+            <i class="bi bi-exclamation-triangle-fill"></i> {{ secret_error }}
+          </div>
+        {% endif %}
+        {% if encryption_enabled %}
+          <p class="text-muted small">
+            <i class="bi bi-lock-fill text-success"></i> Das Secret wird verschlüsselt
+            in der Datenbank gespeichert (ENCRYPTION_KEY aktiv).
+          </p>
+        {% else %}
+          <div class="alert alert-warning py-2 small">
+            <i class="bi bi-unlock-fill"></i> <strong>ENCRYPTION_KEY nicht gesetzt</strong> –
+            das Secret wird unverschlüsselt in der Datenbank gespeichert. Setze die
+            Umgebungsvariable (64 Hex-Zeichen) und starte die App neu.
+          </div>
+        {% endif %}
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="api_key">API Key</label>
+            <input type="text" class="form-control" id="api_key" name="api_key"
+                   placeholder="Neuen Key eingeben (überschreibt alten)">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="api_secret">API Secret</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="api_secret" name="api_secret"
+                     placeholder="Neues Secret eingeben" autocomplete="new-password">
+              <button type="button" class="btn btn-outline-secondary" onclick="toggleSecret()"
+                      title="Secret anzeigen / verbergen">
+                <i class="bi bi-eye" id="eyeIcon"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer d-flex gap-2">
+        <button type="submit" name="action" value="save_api" class="btn btn-primary">
+          <i class="bi bi-check-lg"></i> Speichern
+        </button>
+        <button type="submit" name="action" value="delete_api" class="btn btn-outline-danger"
+                onclick="return confirm('API-Credentials wirklich löschen?');">
+          <i class="bi bi-trash"></i> Löschen
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ===================== E-Mail-Tab ===================== -->
+  <div class="tab-pane fade" id="mail-pane" role="tabpanel" aria-labelledby="mail-tab">
+    <form method="POST" class="card shadow-sm">
+      <div class="card-header fw-semibold"><i class="bi bi-envelope"></i> E-Mail-Benachrichtigungen (SMTP)</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">SMTP-Server</label>
+            <input type="text" class="form-control" name="smtp_server"
+                   value="{{ mail_settings.smtp_server if mail_settings else 'smtp.gmail.com' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">SMTP-Port</label>
+            <input type="number" class="form-control" name="smtp_port"
+                   value="{{ mail_settings.smtp_port if mail_settings else '587' }}">
+            <div class="form-text">587 = STARTTLS, 465 = SSL</div>
+          </div>
+          <div class="col-md-3 d-flex align-items-end">
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" id="use_tls" name="use_tls"
+                     {% if mail_settings and mail_settings.use_tls %}checked{% endif %}>
+              <label class="form-check-label" for="use_tls">STARTTLS aktivieren</label>
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">SMTP-User</label>
+            <input type="text" class="form-control" name="smtp_user"
+                   value="{{ mail_settings.smtp_user if mail_settings else '' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="smtp_pass">SMTP-Passwort</label>
+            <input type="password" class="form-control" id="smtp_pass" name="smtp_pass"
+                   placeholder="Leer lassen, wenn nicht ändern" autocomplete="new-password">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Absender (From)</label>
+            <input type="text" class="form-control" name="from_email"
+                   value="{{ mail_settings.from_email if mail_settings else '' }}" placeholder="name@example.com">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Empfänger (To)</label>
+            <input type="text" class="form-control" name="to_email"
+                   value="{{ mail_settings.to_email if mail_settings else '' }}" placeholder="name@example.com">
+          </div>
+
+          <div class="col-12">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" id="send_on_success" name="send_on_success"
+                     {% if mail_settings and mail_settings.send_on_success %}checked{% endif %}>
+              <label class="form-check-label" for="send_on_success">E-Mail bei erfolgreichem Trade</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" id="send_on_error" name="send_on_error"
+                     {% if mail_settings and mail_settings.send_on_error %}checked{% endif %}>
+              <label class="form-check-label" for="send_on_error">E-Mail bei Fehler</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer d-flex gap-2">
+        <button type="submit" name="action" value="save_email" class="btn btn-primary">
+          <i class="bi bi-check-lg"></i> Speichern
+        </button>
+        <button type="submit" name="action" value="test_email" class="btn btn-outline-secondary">
+          <i class="bi bi-send"></i> Test-E-Mail senden
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ===================== Verkaufsempfehlungen-Tab ===================== -->
+  <div class="tab-pane fade" id="strat-pane" role="tabpanel" aria-labelledby="strat-tab">
+    <form method="POST" class="card shadow-sm">
+      <div class="card-header fw-semibold"><i class="bi bi-lightning-charge"></i> Verkaufsempfehlungen – Strategien &amp; Schwellen</div>
+      <div class="card-body">
+        <div class="alert alert-light border small">
+          <i class="bi bi-info-circle"></i> Hier lassen sich die automatischen Empfehlungen auf dem
+          Portfolio-Dashboard anpassen: Strategien einzeln an-/abschalten und Schwellen für ATH-Nähe,
+          Portfolio-Anteil, Mindestwert und Gewinnziel setzen.
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-12"><h2 class="h6 mb-2">Strategien</h2></div>
+          <div class="col-md-4">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="enabled_s1" name="enabled_s1"
+                     {% if strategy.enabled_s1 %}checked{% endif %}>
+              <label class="form-check-label" for="enabled_s1" data-bs-toggle="tooltip"
+                     title="Steuerfreie Coins im Plus – Gewinn wäre sofort realisierbar.">S1: Steuerfrei im Plus</label>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="enabled_s2" name="enabled_s2"
+                     {% if strategy.enabled_s2 %}checked{% endif %}>
+              <label class="form-check-label" for="enabled_s2" data-bs-toggle="tooltip"
+                     title="Verkauf, wenn der Kurs nahe am 90-Tage-Hoch notiert.">S2: ATH-Nähe</label>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="enabled_s3" name="enabled_s3"
+                     {% if strategy.enabled_s3 %}checked{% endif %}>
+              <label class="form-check-label" for="enabled_s3" data-bs-toggle="tooltip"
+                     title="Warnung, wenn ein Coin mehr als den eingestellten Anteil ausmacht.">S3: Rebalancing</label>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="enabled_s4" name="enabled_s4"
+                     {% if strategy.enabled_s4 %}checked{% endif %}>
+              <label class="form-check-label" for="enabled_s4" data-bs-toggle="tooltip"
+                     title="Gewinnziel: Teilverkauf bei eingestelltem Gewinn und steuerfreier Haltefrist.">S4: Gewinnziel</label>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="enabled_s5" name="enabled_s5"
+                     {% if strategy.enabled_s5 %}checked{% endif %}>
+              <label class="form-check-label" for="enabled_s5" data-bs-toggle="tooltip"
+                     title="Hinweis, wenn die 1-Jahres-Frist bald abläuft.">S5: Bald steuerfrei</label>
+            </div>
+          </div>
+        </div>
+
+        <h2 class="h6 mb-3">Schwellen</h2>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label" for="min_value_eur" data-bs-toggle="tooltip"
+                   title="Unter diesem Positionswert erscheinen keine Empfehlungen.">Mindest-Positionswert (EUR)</label>
+            <input type="number" step="1" min="0" class="form-control" id="min_value_eur"
+                   name="min_value_eur" value="{{ '%.0f'|format(strategy.min_value_eur) }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="rebalance_share" data-bs-toggle="tooltip"
+                   title="Anteil eines Coins am Portfolio, ab dem Rebalancing empfohlen wird.">Rebalancing-Schwelle (% Anteil)</label>
+            <input type="number" step="1" min="1" max="99" class="form-control" id="rebalance_share"
+                   name="rebalance_share" value="{{ '%.0f'|format(strategy.rebalance_share * 100) }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="ath_near_pct" data-bs-toggle="tooltip"
+                   title="Abstand zum 90-Tage-Hoch in % (negativ). Beispiel -5 = innerhalb 5 % unter dem Hoch.">ATH-Nähe (%, negativ)</label>
+            <input type="number" step="0.5" max="0" class="form-control" id="ath_near_pct"
+                   name="ath_near_pct" value="{{ '%.1f'|format(strategy.ath_near_pct) }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="s4_gain_pct" data-bs-toggle="tooltip"
+                   title="Gewinn in %, ab dem Strategie 4 einen Teilverkauf empfiehlt (z. B. 50 = +50 %).">Gewinnziel S4 (% Gewinn)</label>
+            <input type="number" step="1" min="1" class="form-control" id="s4_gain_pct"
+                   name="s4_gain_pct" value="{{ '%.0f'|format(strategy.s4_gain_pct) }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="s4_sell_pct" data-bs-toggle="tooltip"
+                   title="Anteil des Bestands, der bei erreichtem Gewinnziel verkauft werden soll.">Verkaufsanteil S4 (% des Bestands)</label>
+            <input type="number" step="1" min="1" max="100" class="form-control" id="s4_sell_pct"
+                   name="s4_sell_pct" value="{{ '%.0f'|format(strategy.s4_sell_pct) }}">
+          </div>
+        </div>
+      </div>
+      <div class="card-footer d-flex gap-2">
+        <button type="submit" name="action" value="save_strategies" class="btn btn-primary">
+          <i class="bi bi-check-lg"></i> Speichern
+        </button>
+        <a href="{{ url_for('portfolio') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-pie-chart"></i> Portfolio ansehen
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <!-- ===================== Onboarding-Assistent-Tab ===================== -->
+  <div class="tab-pane fade" id="onb-pane" role="tabpanel" aria-labelledby="onb-tab">
+    <form method="POST" class="card shadow-sm">
+      <div class="card-header fw-semibold"><i class="bi bi-rocket-takeoff"></i> Onboarding-Assistent</div>
+      <div class="card-body">
+        <div class="alert alert-light border small">
+          <i class="bi bi-info-circle"></i>
+          Der geführte Erststart (Schritt-für-Schritt-Dialog auf dem Dashboard: API-Key → Import →
+          Portfolio → Zeitplan) lässt sich hier jederzeit wieder aktivieren – z.&nbsp;B. wenn du
+          ihn früher mit „Nicht mehr anzeigen“ ausgeblendet hast.
+        </div>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="onboarding_active" name="onboarding_active"
+                 {% if not onboarding_dismissed %}checked{% endif %}>
+          <label class="form-check-label" for="onboarding_active">
+            Onboarding-Assistent auf dem Dashboard anzeigen
+            <span class="text-muted small">(aus = dauerhaft ausgeblendet)</span>
+          </label>
+        </div>
+        <p class="text-muted small mb-0 mt-2">
+          <i class="bi bi-lightbulb"></i>
+          {% if onboarding_dismissed %}
+            Der Assistent ist aktuell <strong>ausgeblendet</strong>. Schalte ihn oben ein, damit er
+            beim nächsten Dashboard-Besuch wieder erscheint (bis alle 4 Schritte erledigt sind).
+          {% else %}
+            Der Assistent ist <strong>aktiv</strong> und erscheint auf dem Dashboard, bis alle
+            4 Schritte erledigt sind.
+          {% endif %}
+        </p>
+      </div>
+      <div class="card-footer d-flex gap-2">
+        <button type="submit" name="action" value="save_onboarding" class="btn btn-primary">
+          <i class="bi bi-check-lg"></i> Speichern
+        </button>
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+          <i class="bi bi-speedometer2"></i> Zum Dashboard
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleSecret() {
+  const el = document.getElementById('api_secret');
+  const eye = document.getElementById('eyeIcon');
+  if (el.type === 'password') {
+    el.type = 'text';
+    eye.classList.remove('bi-eye');
+    eye.classList.add('bi-eye-slash');
+  } else {
+    el.type = 'password';
+    eye.classList.remove('bi-eye-slash');
+    eye.classList.add('bi-eye');
+  }
+}
+</script>
+{% endblock %}

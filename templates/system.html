@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}System – Bitvavo-Autobot{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+  <h1 class="h3 mb-0"><i class="bi bi-pc-display"></i> System &amp; Healthcheck</h1>
+  <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Zurück
+  </a>
+</div>
+
+<div class="alert alert-light border small">
+  <i class="bi bi-lightbulb"></i>
+  <strong>So liest du diese Seite:</strong> Hier steht alles über den Zustand deiner App –
+  Versionen, Datenbank, Zeitzone und ob dein Bitvavo-API-Key gültig ist (unter
+  <em>API-Zugriff</em>). Solange dort grüne Häkchen stehen, ist alles in Ordnung; bei roten
+  Punkten zeigt der Text, was zu tun ist. Unten im <em>App-Log</em> siehst du die letzten
+  Aktivitäten – nützlich, wenn beim Import oder Kauf etwas nicht klappt. Zusätzlich gibt es den
+  maschinenlesbaren Endpoint <code>/health</code>, den auch <code>verifizieren.sh</code> nutzt.
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h2 class="h6 text-muted mb-1">App-Version</h2>
+        <p class="h4 mb-0">Bitvavo-Autobot <span class="text-primary">{{ app_version }}</span></p>
+        <small class="text-muted">Python {{ python_version }}</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h2 class="h6 text-muted mb-1">Bitvavo-SDK</h2>
+        <p class="h4 mb-0"><span class="text-primary">{{ sdk_version }}</span></p>
+        <small class="text-muted">python-bitvavo-api (offiziell)</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h2 class="h6 text-muted mb-1">Zeitzone</h2>
+        <p class="h4 mb-0">{{ timezone }}</p>
+        <small class="text-muted">Serverzeit: {{ server_time }}</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h2 class="h6 text-muted mb-1">Uptime</h2>
+        <p class="h4 mb-0">{{ (uptime_s // 86400)|int }} T {{ (uptime_s % 86400) // 3600 }} h</p>
+        <small class="text-muted">{{ (uptime_s % 3600) // 60 }} min seit Start</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white"><h2 class="h6 mb-0"><i class="bi bi-database"></i> Datenbank &amp; Logs</h2></div>
+      <table class="table table-sm table-striped align-middle mb-0">
+        <tbody>
+          <tr><th>DB-Pfad</th><td class="text-break"><code>{{ db_path }}</code>
+            {% if db_size is not none %}<br><small class="text-muted">{{ '{:,.0f}'.format(db_size) }} Bytes</small>{% endif %}
+          </td></tr>
+          <tr><th>Log-Pfad</th><td class="text-break"><code>{{ log_path }}</code>
+            {% if log_size is not none %}<br><small class="text-muted">{{ '{:,.0f}'.format(log_size) }} Bytes</small>{% endif %}
+          </td></tr>
+          <tr><th>Einträge</th><td>
+            Trades: <strong>{{ counts.trades }}</strong> · Transfers (Ein-/Aus): <strong>{{ counts.transfers }}</strong> ·
+            Zeitpläne: <strong>{{ counts.schedules }}</strong> · Zeitplan-Zeilen: <strong>{{ counts.schedule_lines }}</strong> ·
+            Kontostand-Snapshots: <strong>{{ counts.balances }}</strong>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white"><h2 class="h6 mb-0"><i class="bi bi-sliders"></i> Betriebsmodus</h2></div>
+      <table class="table table-sm table-striped align-middle mb-0">
+        <tbody>
+          <tr><th>Modus</th><td>
+            {% if simulation_mode %}
+              <span class="badge text-bg-warning"><i class="bi bi-flask"></i> Simulationsmodus</span>
+            {% else %}
+              <span class="badge text-bg-success"><i class="bi bi-lightning"></i> Echtbetrieb</span>
+            {% endif %}
+          </td></tr>
+          <tr><th>Debug</th><td>{% if debug_mode %}<span class="badge text-bg-danger">an</span>{% else %}<span class="badge text-bg-secondary">aus</span>{% endif %}</td></tr>
+          <tr><th>Secret-Verschlüsselung</th><td>
+            {% if encryption_enabled %}
+              <span class="badge text-bg-success">aktiv (ENCRYPTION_KEY)</span>
+            {% else %}
+              <span class="badge text-bg-danger">inaktiv – Secrets liegen im Klartext</span>
+            {% endif %}
+          </td></tr>
+          <tr><th>Scheduler</th><td>
+            {% if scheduler_alive %}
+              <span class="badge text-bg-success"><i class="bi bi-heart-pulse"></i> läuft</span>
+            {% else %}
+              <span class="badge text-bg-danger"><i class="bi bi-exclamation-triangle"></i> gestoppt – geplante Käufe werden NICHT ausgeführt</span>
+            {% endif %}
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if selfcheck_errors %}
+<div class="alert alert-danger">
+  <h2 class="h6 alert-heading mb-2"><i class="bi bi-clipboard-x"></i> Selbstcheck beim Start: {{ selfcheck_errors|length }} Problem(e)</h2>
+  <ul class="mb-0 small">
+    {% for err in selfcheck_errors %}<li>{{ err }}</li>{% endfor %}
+  </ul>
+</div>
+{% else %}
+<div class="alert alert-success py-2">
+  <i class="bi bi-clipboard-check"></i> <strong>Selbstcheck beim Start:</strong> alle Prüfungen bestanden (Datenbank, Schema, Konfiguration).
+</div>
+{% endif %}
+
+<div class="card shadow-sm mb-4">
+  <div class="card-header bg-white"><h2 class="h6 mb-0"><i class="bi bi-key"></i> Bitvavo-API-Key-Status</h2></div>
+  <div class="card-body">
+    {% if key_status %}
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <span class="badge text-bg-secondary">Key: {{ key_status.key_masked }}</span>
+        {% if key_status.secret_present %}
+          <span class="badge text-bg-success"><i class="bi bi-check"></i> Secret hinterlegt</span>
+        {% else %}
+          <span class="badge text-bg-danger"><i class="bi bi-x"></i> Secret fehlt (Fehler 309 beim Import!)</span>
+        {% endif %}
+        {% if key_status.secret_encrypted %}
+          <span class="badge text-bg-info"><i class="bi bi-lock"></i> verschlüsselt gespeichert</span>
+        {% elif key_status.secret_present %}
+          <span class="badge text-bg-warning"><i class="bi bi-unlock"></i> Klartext gespeichert</span>
+        {% endif %}
+        {% if key_status.permissions %}
+          <span class="badge {% if key_status.permissions.trading %}text-bg-danger{% else %}text-bg-success{% endif %}">
+            Handel: {{ 'erlaubt' if key_status.permissions.trading else 'gesperrt' }}
+          </span>
+          <span class="badge {% if key_status.permissions.withdrawal %}text-bg-danger{% else %}text-bg-success{% endif %}">
+            Auszahlung: {{ 'erlaubt' if key_status.permissions.withdrawal else 'gesperrt' }}
+          </span>
+        {% endif %}
+      </div>
+      {% if key_status.decrypt_error %}
+        <div class="alert alert-danger py-2 small mb-0">
+          <i class="bi bi-x-circle"></i> Secret konnte nicht entschlüsselt werden: {{ key_status.decrypt_error }}
+        </div>
+      {% endif %}
+      {% if key_status.permission_error and not key_status.permissions %}
+        <div class="alert alert-warning py-2 small mb-0">
+          <i class="bi bi-exclamation-triangle"></i> {{ key_status.permission_error }}
+        </div>
+      {% endif %}
+      {% if not key_status.secret_ok and not key_status.permission_error and key_status.secret_present %}
+        <div class="alert alert-warning py-2 small mb-0">
+          <i class="bi bi-exclamation-triangle"></i> Secret liegt vor, konnte aber nicht geprüft werden.
+        </div>
+      {% endif %}
+    {% else %}
+      <div class="alert alert-warning py-2 small mb-0">
+        <i class="bi bi-exclamation-triangle"></i> Kein API-Key hinterlegt – Trade-Import, Kontostand
+        und Kaufautomatik funktionieren nicht. Eintragen unter
+        <a href="{{ url_for('settings') }}" class="alert-link">Einstellungen → Bitvavo-API</a>.
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-header bg-white"><h2 class="h6 mb-0"><i class="bi bi-terminal"></i> verifizieren.sh</h2></div>
+  <div class="card-body small">
+    <p class="mb-2">
+      Auf dem Host (nicht im Container) lässt sich die Installation mit dem Skript
+      <code>verifizieren.sh</code> prüfen – es ruft <code>/health</code> ab und checkt DB- und Log-Datei:
+    </p>
+    <pre class="bg-dark text-light p-3 rounded"><code>./verifizieren.sh            # alles prüfen
+./verifizieren.sh --strict   # Exit-Code 1 bei fehlendem Key / DB</code></pre>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-4">
+  <div class="card-header bg-white d-flex flex-wrap align-items-center gap-2">
+    <h2 class="h6 mb-0"><i class="bi bi-file-earmark-text"></i> Log-Anzeige (letzte {{ log_lines|length }} Zeilen)</h2>
+    <div class="ms-auto d-flex gap-2">
+      <a href="{{ url_for('system') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-clockwise"></i> Aktualisieren
+      </a>
+      <a href="{{ url_for('system_log') }}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-download"></i> Log herunterladen
+      </a>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    {% if log_lines %}
+    <pre class="bg-dark text-light p-3 rounded-0 mb-0"
+         style="max-height: 480px; overflow: auto; font-size: .75rem; white-space: pre-wrap;">{{ log_lines|join }}</pre>
+    {% else %}
+    <div class="p-3 small text-muted">Log-Datei (<code>{{ log_path }}</code>) ist leer oder nicht lesbar.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,136 @@
+
+
+Ziel der Anwendung:
+
+Die Web-App soll es Nutzer ermöglichen:
+
+Ihre Krypto-Transaktionen von Bitvavo per API zu importieren.
+
+Automatisch zu erkennen, welche Coins steuerfrei verkauft werden können (nach 1 Jahr Haltezeit, FIFO).
+
+Den steuerfreien Gewinn sowie den steuerpflichtigen Gewinn zu berechnen, wenn alles heute verkauft würde.
+
+Den aktuellen Preis pro Coin anzuzeigen.
+
+Verkaufsempfehlungen zu erhalten, z. B. bei Allzeithoch (ATH), starkem Gewinn oder zur Portfolio-Optimierung.
+
+
+
+---
+
+Funktionale Anforderungen:
+
+
+Transaktionsimport:
+
+API-Anbindung an Bitvavo (API-Key speichern(
+
+Abruf aller relevanten Transaktionen: Käufe, Verkäufe, Transfers, Gebühren.
+
+Optionaler CSV-Upload als Alternative.
+
+Importiert alle Coins aus dem Portfolio.
+
+
+3. FIFO-Steuerberechnung (Deutschland):
+
+Umsetzung des FIFO-Prinzips zur Bestimmung der Haltezeit pro Coin.
+
+Automatische Unterscheidung:
+
+Steuerfreie Coins: >1 Jahr gehalten.
+
+Steuerpflichtige Coins: <1 Jahr gehalten.
+
+
+Berechnung von:
+
+Steuerfreier Gewinn (sofort realisierbar).
+
+Steuerpflichtigem Gewinn (bei Verkauf heute).
+
+
+Hinweis bei bald ablaufender 1-Jahres-Frist.
+
+
+1. Preis- & Portfolioanzeige:
+
+Anzeige des aktuellen Preises jedes Coins.
+
+Berechnung des theoretischen Gesamtwerts des Portfolios.
+
+Anzeige in EUR (automatische Umrechnung zum Transaktionszeitpunkt optional).
+
+
+5. Verkaufsempfehlungen & Strategien:
+
+Die App soll auf Basis steuerlicher und finanzieller Kriterien intelligente Empfehlungen geben:
+
+Strategie 1: Steuerfreie Verkäufe
+
+Empfehlung, Coins zu verkaufen, die steuerfrei und aktuell im Plus sind.
+
+
+Strategie 2: Verkauf bei Kurshoch (ATH)
+
+Analyse, ob Coin in der Nähe eines lokalen oder Allzeithochs liegt.
+
+Hinweis: "Jetzt steuerfrei verkaufen – Coin auf Höchststand".
+
+
+Strategie 3: Rebalancing
+
+Vorschlag, Teilverkauf durchzuführen, wenn ein Coin >40 % vom Portfolio ausmacht.
+
+
+Strategie 4: Gewinnziel erreicht
+
+Beispiel: "25 % verkaufen, wenn +50 % Gewinn und steuerfrei".
+
+
+Strategie 5: Steueroptimierung
+
+Warnung bei bald ablaufender Haltefrist (z. B. in 10 Tagen steuerfrei).
+
+Hinweis bei steuerpflichtigem Verlust (z. B. Coin mit -50 %, Verkauf vermeiden).
+
+
+
+---
+
+Web-GUI 
+
+Dashboard mit:
+
+Portfolioübersicht
+
+Steuerfreier Gewinn
+
+Steuerpflichtiger Gewinn
+
+Verkaufsempfehlungen
+
+
+Eingabemaske für API-Key.
+
+Filter: Coins steuerfrei / steuerpflichtig / Empfehlung vorhanden.
+
+Tooltipps mit Erklärung zu steuerlichen Begriffen, halte es einfach und verständlich 
+
+
+
+---
+
+Technischer Stack:
+
+Python (Flask)
+
+Datenbank: SQLite
+
+Kursdaten: CoinGecko API (kostenlos & einfach)
+
+Transaktionsimport: Bitvavo API
+
+
+
+

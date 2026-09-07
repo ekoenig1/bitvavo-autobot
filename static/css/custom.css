@@ -1,0 +1,35 @@
+/* Bitmaster – eigene Anpassungen über Bootstrap hinaus */
+
+body {
+  min-height: 100vh;
+}
+
+.navbar-brand {
+  font-weight: 600;
+}
+
+.table {
+  vertical-align: middle;
+}
+
+code {
+  font-size: 0.85em;
+}
+/* ---------- Schritt-für-Schritt-Anzeige (Zeitplan-Wizard) ---------- */
+.step-indicator { list-style: none; margin: 0; padding: 0; }
+.step-dot {
+  flex: 1;
+  text-align: center;
+  padding: .55rem .75rem;
+  border-radius: 2rem;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  color: #6c757d;
+  font-weight: 600;
+  font-size: .85rem;
+}
+.step-dot.active {
+  background: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
+}

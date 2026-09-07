@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+{% block title %}Zeitplan bearbeiten – Bitvavo-Autobot{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-9">
+    <h1 class="h3 mb-1"><i class="bi bi-pencil-square"></i> Zeitplan #{{ schedule_id }} bearbeiten</h1>
+    <p class="text-muted mb-4">
+      Passe Positionen, Termin oder Sicherheitsregeln an – deine Änderungen gelten ab dem nächsten
+      geplanten Kauf.
+    </p>
+
+    <ol class="list-unstyled d-flex gap-2 mb-4 step-indicator">
+      <li class="step-dot active" data-step="1">1. Was kaufen?</li>
+      <li class="step-dot" data-step="2">2. Wann kaufen?</li>
+      <li class="step-dot" data-step="3">3. Sicherheitsregeln</li>
+    </ol>
+
+    <form id="scheduleForm" method="POST" class="card shadow-sm">
+      <div class="card-body">
+
+        <div class="wizard-step" id="step1">
+          <div class="alert alert-light border small">
+            <i class="bi bi-lightbulb"></i>
+            <strong>Deine Positionen:</strong> Coin + Betrag = wie viel der Bot bei jedem Termin
+            automatisch kauft. Hinzufügen, ändern oder entfernen – ganz wie du möchtest.
+          </div>
+
+          <h2 class="h6 mb-2">Positionen</h2>
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th class="w-50">Coin</th>
+                  <th>Betrag pro Kauf (EUR)</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="rowsBody">
+                <!-- Zeilen werden per JavaScript gefüllt -->
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="addRow">
+            <i class="bi bi-plus-circle"></i> Weitere Position hinzufügen
+          </button>
+          <span class="text-muted small ms-2">bis zu 5 Positionen</span>
+
+          <div class="alert alert-warning py-2 small d-none" id="rowError">
+            <i class="bi bi-exclamation-triangle"></i> Bitte mindestens eine Position mit Coin und
+            Betrag (größer 0) angeben.
+          </div>
+        </div>
+
+        <div class="wizard-step d-none" id="step2">
+          <div class="alert alert-light border small">
+            <i class="bi bi-lightbulb"></i>
+            <strong>Wann kauft der Bot?</strong> Zum gewählten Wochentag und Uhrzeit führt er alle
+            Positionen dieses Plans aus – jede Woche automatisch zur selben Zeit.
+          </div>
+          <div class="row g-4">
+            <div class="col-md-6">
+              <label class="form-label" for="weekday">Wochentag</label>
+              <select id="weekday" name="weekday" class="form-select">
+                {% set de_days = {'Monday':'Montag','Tuesday':'Dienstag','Wednesday':'Mittwoch','Thursday':'Donnerstag','Friday':'Freitag','Saturday':'Samstag','Sunday':'Sonntag'} %}
+                {% for eng, deu in de_days.items() %}
+                  <option value="{{ eng }}" {% if eng == wd %}selected{% endif %}>{{ deu }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Der Wochentag, an dem gekauft werden soll.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="time_of_day">Uhrzeit</label>
+              <input type="time" class="form-control" id="time_of_day" name="time_of_day" value="{{ tod }}">
+              <div class="form-text">Z. B. <code>09:00</code> = morgens um 9 Uhr.</div>
+            </div>
+          </div>
+          <div class="mt-3 p-3 bg-light border rounded small">
+            <i class="bi bi-hourglass-split"></i>
+            <strong>Dein Plan:</strong> <span id="termPreviewText">–</span>
+          </div>
+        </div>
+
+        <div class="wizard-step d-none" id="step3">
+          <div class="alert alert-light border small">
+            <i class="bi bi-lightbulb"></i>
+            <strong>Sicherheitsregeln (optional):</strong> Damit der Bot nur zu günstigen Kursen
+            kauft. Leere Felder = keine Einschränkung.
+          </div>
+
+          <div class="row g-4">
+            <div class="col-md-6">
+              <label class="form-label" for="rule_max_price">Höchstpreis pro Coin (EUR)</label>
+              <input type="number" step="0.01" min="0" id="rule_max_price" name="rule_max_price"
+                     class="form-control" placeholder="z. B. 65.000" value="{{ rules.max_price if rules.max_price else '' }}">
+              <div class="form-text">
+                <i class="bi bi-info-circle"></i> Kauf nur, wenn der Kurs <strong>unter</strong>
+                diesem Preis liegt. Schützt vor teuren Käufen nach plötzlichen Kurssprüngen.
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="rule_ath_dip_pct">Mindestabstand zum Allzeithoch (%)</label>
+              <input type="number" step="0.1" min="0" id="rule_ath_dip_pct" name="rule_ath_dip_pct"
+                     class="form-control" placeholder="z. B. 10" value="{{ rules.ath_dip_pct if rules.ath_dip_pct else '' }}">
+              <div class="form-text">
+                <i class="bi bi-info-circle"></i> Kauf nur bei einem Kurs-Dip: Der Preis muss
+                mindestens X % <strong>unter</strong> dem Höchststand der letzten 90 Tage liegen.
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="rule_sma">Kurs unter gleitendem Mittel (Trend)</label>
+              <select id="rule_sma" name="rule_sma" class="form-select">
+                <option value="off" {% if (rules.sma or 'off') == 'off' %}selected{% endif %}>Aus (keine Einschränkung)</option>
+                <option value="below_sma9" {% if rules.sma == 'below_sma9' %}selected{% endif %}>Kurs unter 9-Tage-Mittel</option>
+                <option value="below_sma50" {% if rules.sma == 'below_sma50' %}selected{% endif %}>Kurs unter 50-Tage-Mittel</option>
+              </select>
+              <div class="form-text">
+                <i class="bi bi-info-circle"></i> Nur kaufen, wenn der Kurs unter dem Durchschnitt
+                der letzten 9 bzw. 50 Tage liegt – du kaufst dann „im Abschwung".
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="rule_rsi_min">RSI-Band (Marktstimmung)</label>
+              <div class="d-flex gap-2 align-items-center">
+                <input type="number" step="1" min="0" max="100" id="rule_rsi_min" name="rule_rsi_min"
+                       class="form-control" placeholder="von, z. B. 30" value="{{ rules.rsi_min if rules.rsi_min is not none else '' }}">
+                <span>bis</span>
+                <input type="number" step="1" min="0" max="100" id="rule_rsi_max" name="rule_rsi_max"
+                       class="form-control" placeholder="bis, z. B. 70" value="{{ rules.rsi_max if rules.rsi_max is not none else '' }}">
+              </div>
+              <div class="form-text">
+                <i class="bi bi-info-circle"></i> RSI unter 30 = überverkauft (eher günstig), über 70 =
+                überkauft (eher teuer). Nur kaufen, wenn der RSI im eingestellten Bereich liegt.
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="rule_max_invest">Max. gesamt investieren pro Coin (EUR)</label>
+              <input type="number" step="0.01" min="0" id="rule_max_invest" name="rule_max_invest"
+                     class="form-control" placeholder="z. B. 1000" value="{{ rules.max_invest if rules.max_invest else '' }}">
+              <div class="form-text">
+                <i class="bi bi-info-circle"></i> Stoppt den Sparplan für einen Coin, sobald die
+                Summe <strong>aller Käufe</strong> dieses Coins diesen Betrag erreicht hat.
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 p-3 bg-light border rounded small">
+            <i class="bi bi-clipboard-check"></i>
+            <strong>Zusammenfassung:</strong> <span id="summaryText">–</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-footer d-flex justify-content-between align-items-center">
+        <button type="button" class="btn btn-outline-secondary" id="prevBtn" style="visibility: hidden">
+          <i class="bi bi-arrow-left"></i> Zurück
+        </button>
+        <button type="button" class="btn btn-primary" id="nextBtn">
+          Weiter <i class="bi bi-arrow-right"></i>
+        </button>
+        <button type="submit" class="btn btn-success d-none" id="submitBtn">
+          <i class="bi bi-check-lg"></i> Änderungen speichern
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+  const ASSETS = {{ allowed_assets|tojson }};
+  const NAMES = {
+    {% for t in top_assets %}{{ t.symbol|tojson }}: {{ t.name|tojson }},
+    {% endfor %}
+  };
+  const DAYS = {
+    'Monday': 'Montag', 'Tuesday': 'Dienstag', 'Wednesday': 'Mittwoch',
+    'Thursday': 'Donnerstag', 'Friday': 'Freitag', 'Saturday': 'Samstag', 'Sunday': 'Sonntag'
+  };
+  const MAX_ROWS = 5;
+  const rowsBody = document.getElementById('rowsBody');
+  const rowError = document.getElementById('rowError');
+
+  function liveRows() {
+    return Array.prototype.slice.call(rowsBody.querySelectorAll('tr'));
+  }
+
+  function symLabel(sym) {
+    return sym + (NAMES[sym] ? ' – ' + NAMES[sym] : '');
+  }
+
+  function rowTemplate(asset, amount) {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><select name="asset" class="form-select asset-sel">' +
+        '<option value="">-- Coin wählen --</option>' +
+        ASSETS.map(function (a) {
+          return '<option value="' + a + '">' + symLabel(a) + '</option>';
+        }).join('') +
+      '</select></td>' +
+      '<td><input type="number" step="0.01" min="0" name="amount_eur" class="form-control amount-inp" ' +
+        'placeholder="z. B. 50"></td>' +
+      '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger rm-row">' +
+        '<i class="bi bi-x-lg"></i></button></td>';
+    const sel = tr.querySelector('.asset-sel');
+    const inp = tr.querySelector('.amount-inp');
+    if (asset) sel.value = asset;
+    if (amount) inp.value = amount;
+    tr.querySelector('.rm-row').addEventListener('click', function () {
+      tr.remove();
+      syncUI();
+    });
+    rowsBody.appendChild(tr);
+    return tr;
+  }
+
+  // Leere Zeilen (weder Coin noch Betrag) entfernen – außer die letzte Zeile:
+  // sie dient als frische Eingabezeile für den nächsten Eintrag.
+  function pruneEmptyRows() {
+    const live = liveRows();
+    if (live.length <= 1) return;
+    const last = live[live.length - 1];
+    live.forEach(function (tr) {
+      if (tr === last) return;
+      const sel = tr.querySelector('.asset-sel');
+      const inp = tr.querySelector('.amount-inp');
+      if (sel && !sel.value && (!inp || !inp.value)) tr.remove();
+    });
+  }
+
+  function addRow(asset, amount) {
+    pruneEmptyRows();
+    if (liveRows().length >= MAX_ROWS) {
+      alert('Maximal ' + MAX_ROWS + ' Positionen pro Zeitplan möglich.');
+      return;
+    }
+    rowTemplate(asset || '', amount || '');
+    syncUI();
+  }
+
+  function stepRows() {
+    return Array.prototype.map.call(document.querySelectorAll('#rowsBody tr'), function (tr) {
+      return {
+        asset: tr.querySelector('.asset-sel').value,
+        amount: parseFloat(tr.querySelector('.amount-inp').value) || 0
+      };
+    });
+  }
+
+  function syncUI() {
+    // Nur aktuell im DOM vorhandene Zeilen zählen – kein separates rows-Array,
+    // damit entfernte/bereinigte Zeilen nie verwaiste Referenzen hinterlassen.
+    pruneEmptyRows();
+    document.getElementById('addRow').disabled = liveRows().length >= MAX_ROWS;
+    updateSummaries();
+  }
+
+  function validateStep1() {
+    const ok = stepRows().some(function (r) { return r.asset && r.amount > 0; });
+    rowError.classList.toggle('d-none', ok);
+    return ok;
+  }
+
+  let step = 1;
+  function showStep(n) {
+    step = n;
+    document.querySelectorAll('.wizard-step').forEach(function (el, i) { el.classList.toggle('d-none', i !== n - 1); });
+    document.querySelectorAll('.step-dot').forEach(function (el) {
+      el.classList.toggle('active', parseInt(el.dataset.step, 10) <= n);
+    });
+    document.getElementById('prevBtn').style.visibility = n === 1 ? 'hidden' : 'visible';
+    document.getElementById('nextBtn').classList.toggle('d-none', n === 3);
+    document.getElementById('submitBtn').classList.toggle('d-none', n !== 3);
+    updateSummaries();
+  }
+
+  function updateSummaries() {
+    const sr = stepRows().filter(function (r) { return r.asset && r.amount > 0; });
+    const day = DAYS[document.getElementById('weekday').value] || '?';
+    const time = document.getElementById('time_of_day').value || '?';
+    const termParts = sr.length
+      ? sr.map(function (r) { return r.amount.toLocaleString('de-DE') + ' € ' + r.asset; }).join(', ')
+      : '– noch keine Positionen –';
+    document.getElementById('termPreviewText').textContent =
+      'Jeden ' + day.toLowerCase() + ' um ' + time + ' Uhr kauft der Bot: ' + termParts + '.';
+
+    const rules = [];
+    const mp = document.getElementById('rule_max_price').value;
+    const dip = document.getElementById('rule_ath_dip_pct').value;
+    const sma = document.getElementById('rule_sma').value;
+    const rmin = document.getElementById('rule_rsi_min').value;
+    const rmax = document.getElementById('rule_rsi_max').value;
+    const inv = document.getElementById('rule_max_invest').value;
+    if (mp) rules.push('max. ' + mp + ' € pro Coin');
+    if (dip) rules.push('nur bei ≥ ' + dip + '% unter ATH');
+    if (sma === 'below_sma9') rules.push('Kurs unter SMA9');
+    if (sma === 'below_sma50') rules.push('Kurs unter SMA50');
+    if (rmin || rmax) rules.push('RSI ' + (rmin || '–') + ' bis ' + (rmax || '–'));
+    if (inv) rules.push('max. ' + inv + ' € Gesamt pro Coin');
+    const posText = sr.length
+      ? sr.map(function (r) { return r.asset + ' (' + r.amount.toLocaleString('de-DE') + ' €)'; }).join(', ')
+      : 'keine Positionen';
+    const ruleText = rules.length ? rules.join('; ') : 'keine (es darf immer gekauft werden)';
+    document.getElementById('summaryText').textContent =
+      'Jeden ' + day.toLowerCase() + ' um ' + time + ' Uhr: ' + posText + '. Regeln: ' + ruleText + '.';
+  }
+
+  document.getElementById('addRow').addEventListener('click', function () { addRow(); });
+  document.getElementById('weekday').addEventListener('change', updateSummaries);
+  document.getElementById('time_of_day').addEventListener('input', updateSummaries);
+  ['rule_max_price', 'rule_ath_dip_pct', 'rule_sma', 'rule_rsi_min', 'rule_rsi_max', 'rule_max_invest']
+    .forEach(function (id) {
+      document.getElementById(id).addEventListener('input', updateSummaries);
+    });
+  document.getElementById('nextBtn').addEventListener('click', function () {
+    if (step === 1 && !validateStep1()) return;
+    showStep(step + 1);
+  });
+  document.getElementById('prevBtn').addEventListener('click', function () { showStep(step - 1); });
+  document.getElementById('scheduleForm').addEventListener('submit', function (e) {
+    if (!validateStep1()) { e.preventDefault(); showStep(1); return false; }
+  });
+
+  // Vorbelegung aus der Datenbank
+  const initial = {{ lines|tojson }};
+  if (initial.length) {
+    initial.forEach(function (l) { addRow(l[0], l[1]); });
+  }
+  if (document.querySelectorAll('#rowsBody tr').length === 0) {
+    addRow();
+  }
+  showStep(1);
+})();
+</script>
+{% endblock %}

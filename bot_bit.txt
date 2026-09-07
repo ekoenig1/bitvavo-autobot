@@ -1,0 +1,103 @@
+Hier ist eine kompakte, verständliche Übersicht (auf Deutsch), was das Programm leistet:
+
+# Zweck & Überblick
+
+* Web-App (Flask) für **automatisierte Krypto-Investments (DCA & Regeln)** mit **Bitvavo** als Börse.
+* Verwaltung von **Investitionsplänen**, **Trades**, **Kontoständen**, **Preishistorie** und **technischen Indikatoren**.
+* **Kein Simulationsmodus** – alle Funktionen arbeiten mit echten Bitvavo-Daten/Orders (sofern API-Keys hinterlegt sind).
+
+# Hauptfunktionen
+
+## 1) Benutzeroberfläche (Flask)
+
+* **Login** mit Master-Passwort (einfacher Schutz).
+* **Startseite** mit Übersicht aller Investitionspläne (aktiv/inaktiv, Aktionen: bearbeiten, (de)aktivieren, löschen).
+* **Plan anlegen/ändern**: Asset, Betrag, Währung, Frequenz (täglich/wöchentlich/monatlich), Smart-Intervals (mehrfach pro Tag), FeeCutter (Limit-Order unter Marktpreis), Handelsregeln (Max-Preis, % unter ATH, SMA, RSI, maximales Gesamtinvestment), **Zeitplanung** (Uhrzeit bei daily/weekly/monthly).
+* **Kontostand anzeigen** (live von Bitvavo abfragen, speichern und letzte Abfrage vergleichen).
+* **Trades anzeigen** (DB-Historie inkl. Order-ID, Trade-ID, Side).
+* **Trade-Historie importieren**: Button „Jetzt Bitvavo-Trade-Historie importieren“.
+
+## 2) Datenbank & Persistenz (SQLite)
+
+* Tabellen:
+
+  * `credentials` (Bitvavo API-Key/-Secret).
+  * `investment_plans` (alle Planparameter inkl. Zeitfelder).
+  * `trades` (Zeitpunkt, Asset, investierter EUR-Betrag, erhaltene Menge, Durchschnittspreis, Order-ID, Plan-ID, **Trade-ID**, Side).
+  * `balances` (Kontostands-Snapshots).
+  * `historical_rates` (tägliche Preise pro Asset in EUR).
+  * `email_settings` (SMTP-Konfiguration, Flags für Erfolgs-/Fehler-Mails).
+  * `technical_indicators` (SMA9, SMA50, RSI14, ATH).
+* **Migration**: fehlende Spalten werden bei Start sanft ergänzt.
+* Alle DB-Zugriffe über Context-Manager; Logging vorhanden.
+
+## 3) Bitvavo-Integration
+
+* **API-Client** aus gespeicherten Credentials.
+* **Retry-Mechanismus** für API-Aufrufe (Fehlertoleranz).
+* **Kursabfragen** (tickerPrice), **Candles** (für Indikatoren), **Balance**, **Order-Platzierung** (Market oder Limit/„FeeCutter“).
+
+## 4) Handelslogik & Regeln
+
+* Vor jedem Kauf: **Regelprüfung** gegen:
+
+  * Maximalpreis (aktueller Kurs ≤ Grenzwert),
+  * Rückgang ggü. **ATH** (um X% oder mehr),
+  * **SMA-Regel** (z. B. nur kaufen, wenn Kurs < SMA9),
+  * **RSI-Band** (nur, wenn RSI zwischen Unter- und Obergrenze),
+  * **Maximales Gesamtinvestment** pro Plan.
+* Bei Regel-Erfüllung: Order auf Bitvavo (Market oder Limit mit Rabatt).
+* **Trade-Speicherung** inkl. Fills → berechneter Durchschnittspreis.
+* Optionaler **E-Mail-Versand** bei Erfolg/Fehler.
+
+## 5) Technische Indikatoren & Preise
+
+* **Täglicher Preis-Snapshot** pro relevantes Asset → `historical_rates`.
+* **Technische Indikatoren** (SMA9, SMA50, RSI14, ATH) aus letzten 90 Tagen Candles; jüngste Werte in `technical_indicators`.
+
+## 6) Zeitplanung (Scheduler)
+
+* Interner Scheduler (thread) mit **sekündlichem run**:
+
+  * Täglich 00:00: **Preis-Update**.
+  * Täglich 01:00: **Indikator-Update**.
+  * **Pläne**: je nach Frequenz/Uhrzeit/Smart-Intervals (mehrfach täglich), wöchentlich (Wochentag+Zeit) oder monatlich (Tag+Zeit).
+* Bei Fälligkeit wird die zum Plan gehörige Kauf-Routine ausgeführt.
+
+## 7) E-Mail-System (optional)
+
+* SMTP-Konfiguration in der UI speichern.
+* **Test-E-Mail** aus den Einstellungen.
+* **Benachrichtigungen**: bei erfolgreichem Trade und/oder Fehler (konfigurierbar, TLS optional).
+
+## 8) Import der Bitvavo-Trade-Historie
+
+* Ruft **eigene Trades** pro Market (`ASSET-EUR`) seit X Tagen ab.
+* **Dedupliziert** anhand `trade_id` oder (order\_id + Timestamp-Nähe).
+* Speichert fehlende Trades in `trades`.
+* Zusammenfassende Rückgabe (Assets, geprüfte Einträge, importierte Anzahl).
+* Über die UI per Link aus der Trades-Ansicht aufrufbar.
+
+# Sicherheit & Betrieb
+
+* Einfache **Session-Login**-Absicherung (Master-Passwort).
+* **Logging** in Datei + Konsole.
+* **Konfigurierbar** via Umgebungsvariablen (`FLASK_SECRET_KEY`, `MASTER_PASSWORD`).
+* **Kein** SIMULATION\_MODE: alle Daten/Orders sind „echt“ (Achtung: API-Keys korrekt setzen).
+
+# Routen (Auszug)
+
+* `/login` / `/do_login` – Login.
+* `/` – Dashboard/Übersicht.
+* `/settings` – API- & Mail-Einstellungen.
+* `/add_plan`, `/edit_plan/<id>` – Pläne verwalten.
+* `/toggle_plan/<id>`, `/delete_plan/<id>`.
+* `/balance` – Kontostand abrufen & anzeigen.
+* `/trades` – Trades-Tabelle + Link zum Import.
+* `/import_trades` – Bitvavo-Trade-Import (365 Tage standard).
+
+# Start
+
+* Beim Start: `init_db()`, `migrate_db()`, **Scheduler laden**, Flask-Server auf `0.0.0.0:5000` (Debug an, kein Reloader).
+
+Wenn du magst, kann ich dir auch noch eine **Checkliste** geben (API-Key setzen, SMTP testen, ersten Plan anlegen) oder eine **kurze Anleitung**, wie du typische DCA-Pläne mit Regeln sinnvoll konfigurieren kannst.
